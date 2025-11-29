@@ -187,7 +187,7 @@ export default function Home() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Complete Tasks, Win Prizes</h1>
-            <p className="text-muted-foreground mt-2 max-w-lg mx-auto">
+            <p className="text-sm text-muted-foreground mt-2 max-w-lg mx-auto">
               Complete three simple social tasks, mint your SBT, and enter the lottery for a chance to win up to $5!
             </p>
           </div>
