@@ -24,10 +24,10 @@ export const APP_CONFIG = {
   // After deploying contracts, update these addresses
   
   // SBT Contract address on Base
-  sbtContractAddress: "0x0000000000000000000000000000000000000000",
+  sbtContractAddress: "0x72D7eC7607FF89c83c151d006BddA48101629987",
   
   // Lottery Contract address on Base
-  lotteryContractAddress: "0x0000000000000000000000000000000000000000",
+  lotteryContractAddress: "0x03f2ee031C1d383818c4e98b3d291247cab31C9a",
   
   // ============================================
   // NETWORK CONFIGURATION
