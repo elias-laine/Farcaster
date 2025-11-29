@@ -339,7 +339,7 @@ async function verifyLike(fid: number, castHash: string): Promise<boolean> {
       return true;
     }
     
-    const url = `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash`;
+    const url = `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash&viewer_fid=${fid}`;
     console.log(`[verifyLike] Fetching from: ${url}`);
     
     const response = await fetch(url, {
@@ -382,7 +382,7 @@ async function verifyRecast(fid: number, castHash: string): Promise<boolean> {
     }
     
     const response = await fetch(
-      `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash`,
+      `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash&viewer_fid=${fid}`,
       {
         headers: {
           "api_key": CONFIG.NEYNAR_API_KEY,
