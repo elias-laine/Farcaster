@@ -148,6 +148,14 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
         // Select random winners
         _selectWinners(winnersCount);
 
+        // Distribute prizes to winners
+        uint256 totalPrizeAmount = winnersCount * currentTier.prizePerWinner;
+        require(address(this).balance >= totalPrizeAmount, "Insufficient funds for prizes");
+        
+        for (uint256 i = 0; i < winners.length; i++) {
+            payable(winners[i]).transfer(currentTier.prizePerWinner);
+        }
+
         emit LotteryExecuted(winners, currentTier.prizePerWinner, block.timestamp);
     }
 
@@ -279,10 +287,21 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Withdraw remaining funds (only owner)
+     * @dev Withdraw remaining funds (only owner, after lottery execution)
+     */
+    function withdrawRemaining() external onlyOwner nonReentrant {
+        require(isExecuted, "Lottery not executed yet");
+        uint256 remaining = address(this).balance;
+        require(remaining > 0, "No remaining funds");
+        payable(owner()).transfer(remaining);
+        emit FundsWithdrawn(owner(), remaining);
+    }
+
+    /**
+     * @dev Withdraw specific amount (only owner)
      * @param amount Amount to withdraw
      */
-    function withdrawFunds(uint256 amount) external onlyOwner {
+    function withdrawFunds(uint256 amount) external onlyOwner nonReentrant {
         if (address(this).balance < amount) revert InsufficientFunds();
         payable(owner()).transfer(amount);
         emit FundsWithdrawn(owner(), amount);
