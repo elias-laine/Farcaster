@@ -418,8 +418,8 @@ async function getLotteryStatsFromBlockchain() {
       minParticipants: 0,
       maxParticipants: undefined,
       winnersCount: Number(currentWinnersCount),
-      prizePerWinner: Number(currentPrizePerWinner),
-      totalPrize: Number(currentTotalPrize),
+      prizePerWinner: parseFloat(ethers.formatEther(currentPrizePerWinner)),
+      totalPrize: parseFloat(ethers.formatEther(currentTotalPrize)),
     };
 
     const stats = {
