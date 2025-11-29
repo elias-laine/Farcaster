@@ -156,11 +156,14 @@ export function MintSection({ isEligible, hasMinted, onMintSuccess, fid }: MintS
         )}
 
         {hasMinted ? (
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-4 w-full">
             <div className="flex items-center gap-2 text-success">
               <CheckCircle2 className="h-5 w-5" />
               <span className="font-medium">SBT Minted</span>
             </div>
+            <p className="text-center text-foreground font-medium">
+              شما با موفقیت وارد قرعه‌کشی شدید!
+            </p>
             {txHash && (
               <a
                 href={`${APP_CONFIG.explorerUrl}/tx/${txHash}`}
@@ -173,6 +176,19 @@ export function MintSection({ isEligible, hasMinted, onMintSuccess, fid }: MintS
                 <ExternalLink className="h-3 w-3" />
               </a>
             )}
+            <div className="pt-2 text-center text-sm text-muted-foreground">
+              برای قرعه‌کشی‌های بیشتر{" "}
+              <a
+                href="https://farcaster.xyz/book"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+                data-testid="link-follow-book"
+              >
+                @book
+              </a>
+              {" "}را دنبال کنید.
+            </div>
           </div>
         ) : (
           <>
