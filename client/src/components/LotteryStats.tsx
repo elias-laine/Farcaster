@@ -165,7 +165,7 @@ export function LotteryStats({ stats, isLoading }: LotteryStatsProps) {
               {timeRemaining}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              {new Date(stats.deadline * 1000).toLocaleString()}
+              {new Date(stats.deadline < 100000000000 ? stats.deadline * 1000 : stats.deadline).toLocaleString()}
             </p>
           </CardContent>
         </Card>
