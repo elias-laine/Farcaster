@@ -156,13 +156,16 @@ export function LotteryStats({ stats, isLoading }: LotteryStatsProps) {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Clock className="h-4 w-4" />
-              <span className="text-sm">Time Left</span>
+              <span className="text-sm">Deadline</span>
             </div>
             <p 
               className="text-2xl font-bold font-mono text-foreground"
               data-testid="text-time-remaining"
             >
               {timeRemaining}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {new Date(stats.deadline * 1000).toLocaleString()}
             </p>
           </CardContent>
         </Card>
