@@ -34,6 +34,12 @@ const CONFIG = {
   SBT_CONTRACT_ADDRESS: process.env.SBT_CONTRACT_ADDRESS || "",
 };
 
+// Debug log config
+console.log("[CONFIG] NEYNAR_API_KEY exists:", !!CONFIG.NEYNAR_API_KEY);
+console.log("[CONFIG] CAST_HASH:", CONFIG.CAST_HASH);
+console.log("[CONFIG] TARGET_FID:", CONFIG.TARGET_FID);
+console.log("[CONFIG] SIGNER_PRIVATE_KEY exists:", !!CONFIG.SIGNER_PRIVATE_KEY);
+
 // Neynar API base URL
 const NEYNAR_API_URL = "https://api.neynar.com/v2/farcaster";
 
