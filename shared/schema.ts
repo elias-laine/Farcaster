@@ -100,9 +100,9 @@ export type LotteryStats = z.infer<typeof lotteryStatsSchema>;
 // Lottery tiers configuration
 export const LOTTERY_TIERS: LotteryTier[] = [
   { minParticipants: 0, maxParticipants: 99, winnersCount: 1, prizePerWinner: 5, totalPrize: 5 },
-  { minParticipants: 100, maxParticipants: 499, winnersCount: 2, prizePerWinner: 10, totalPrize: 20 },
-  { minParticipants: 500, maxParticipants: 999, winnersCount: 3, prizePerWinner: 15, totalPrize: 45 },
-  { minParticipants: 1000, maxParticipants: undefined, winnersCount: 4, prizePerWinner: 20, totalPrize: 80 },
+  { minParticipants: 100, maxParticipants: 499, winnersCount: 2, prizePerWinner: 5, totalPrize: 10 },
+  { minParticipants: 500, maxParticipants: 999, winnersCount: 3, prizePerWinner: 5, totalPrize: 15 },
+  { minParticipants: 1000, maxParticipants: undefined, winnersCount: 4, prizePerWinner: 5, totalPrize: 20 },
 ];
 
 // Get current tier based on participants count
