@@ -127,6 +127,7 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
     /**
      * @dev Execute the lottery and select winners
      * @notice Can only be called after deadline by owner
+     * @notice Winners are selected on-chain but no funds are transferred (decentralized)
      */
     function executeLottery() external onlyOwner nonReentrant {
         if (isExecuted) revert LotteryAlreadyExecuted();
@@ -145,17 +146,11 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
             winnersCount = participants.length;
         }
 
-        // Select random winners
+        // Select random winners (decentralized, on-chain)
         _selectWinners(winnersCount);
 
-        // Distribute prizes to winners
-        uint256 totalPrizeAmount = winnersCount * currentTier.prizePerWinner;
-        require(address(this).balance >= totalPrizeAmount, "Insufficient funds for prizes");
-        
-        for (uint256 i = 0; i < winners.length; i++) {
-            payable(winners[i]).transfer(currentTier.prizePerWinner);
-        }
-
+        // Emit event with winners and prize info
+        // Note: Winners are stored on-chain, prize distribution handled off-chain or manually
         emit LotteryExecuted(winners, currentTier.prizePerWinner, block.timestamp);
     }
 
