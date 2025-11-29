@@ -79,31 +79,31 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
             minParticipants: 0,
             maxParticipants: 99,
             winnersCount: 1,
-            prizePerWinner: 5 ether // Using ether for simplicity, adjust for actual value
+            prizePerWinner: 5 ether
         }));
 
-        // Tier 2: 100-499 participants: 2 winners, $10 each
+        // Tier 2: 100-499 participants: 2 winners, $5 each
         prizeTiers.push(PrizeTier({
             minParticipants: 100,
             maxParticipants: 499,
             winnersCount: 2,
-            prizePerWinner: 10 ether
+            prizePerWinner: 5 ether
         }));
 
-        // Tier 3: 500-999 participants: 3 winners, $15 each
+        // Tier 3: 500-999 participants: 3 winners, $5 each
         prizeTiers.push(PrizeTier({
             minParticipants: 500,
             maxParticipants: 999,
             winnersCount: 3,
-            prizePerWinner: 15 ether
+            prizePerWinner: 5 ether
         }));
 
-        // Tier 4: 1000+ participants: 4 winners, $20 each
+        // Tier 4: 1000+ participants: 4 winners, $5 each
         prizeTiers.push(PrizeTier({
             minParticipants: 1000,
             maxParticipants: 0, // Unlimited
             winnersCount: 4,
-            prizePerWinner: 20 ether
+            prizePerWinner: 5 ether
         }));
     }
 
