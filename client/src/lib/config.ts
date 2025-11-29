@@ -5,18 +5,18 @@
 export const APP_CONFIG = {
   // Cast to like and recast
   // Change this to your cast hash (the unique identifier of your cast)
-  castHash: "0x1234567890abcdef1234567890abcdef12345678",
+  castHash: "0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6",
   
   // Cast URL for display (clickable link)
   // Change this to the full URL of your cast
-  castUrl: "https://warpcast.com/yourhandle/0x1234567",
+  castUrl: "https://farcaster.xyz/hossein2001/0x28a80f62",
   
   // Account to follow
   // Change this to the Farcaster ID (FID) of the account users should follow
-  targetFid: 123456,
+  targetFid: 958667,
   
   // Username of the account to follow (for display)
-  targetUsername: "yourhandle",
+  targetUsername: "hossein2001",
   
   // ============================================
   // SMART CONTRACT ADDRESSES
