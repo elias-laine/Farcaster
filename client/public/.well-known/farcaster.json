@@ -1,0 +1,18 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "frame": {
+    "version": "1",
+    "name": "Social Quest",
+    "iconUrl": "https://your-domain.com/icon.png",
+    "homeUrl": "https://your-domain.com",
+    "imageUrl": "https://your-domain.com/og-image.png",
+    "buttonTitle": "Start Quest",
+    "splashImageUrl": "https://your-domain.com/splash.png",
+    "splashBackgroundColor": "#7c3aed",
+    "webhookUrl": "https://your-domain.com/api/webhook"
+  }
+}
