@@ -12,13 +12,22 @@ export function serveStatic(app: Express) {
     );
   }
 
-  // Serve static files from dist/public
-  app.use(express.static(distPath));
+  // Serve static files first
+  app.use(express.static(distPath, { maxAge: "1h" }));
 
-  // SPA routing: serve index.html for all non-API routes
-  app.get("*", (_req, res) => {
-    res.sendFile(path.join(distPath, "index.html"), (err) => {
-      if (err) res.status(500).send(err);
-    });
+  // Catch-all: serve index.html for SPA routing (but NOT for /api routes)
+  app.use((req, res, next) => {
+    // Skip if it's an API route
+    if (req.path.startsWith("/api")) {
+      return next();
+    }
+    
+    // Try to serve the file, if not found, send index.html
+    const filePath = path.join(distPath, req.path);
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      res.sendFile(filePath);
+    } else {
+      res.sendFile(path.join(distPath, "index.html"));
+    }
   });
 }
