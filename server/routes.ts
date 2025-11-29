@@ -416,7 +416,7 @@ async function verifyFollow(fid: number, targetFid: number): Promise<boolean> {
     }
     
     const response = await fetch(
-      `${NEYNAR_API_URL}/user/bulk?fids=${fid}&viewer_fid=${targetFid}`,
+      `${NEYNAR_API_URL}/user/bulk?fids=${targetFid}&viewer_fid=${fid}`,
       {
         headers: {
           "api_key": CONFIG.NEYNAR_API_KEY,
@@ -433,7 +433,7 @@ async function verifyFollow(fid: number, targetFid: number): Promise<boolean> {
     const user = data.users?.[0];
     console.log("[verifyFollow] User data:", user?.viewer_context);
     
-    // Check if the user is following the target
+    // Check if the viewer (fid) is following the target user
     const isFollowing = user?.viewer_context?.following === true;
     console.log(`[verifyFollow] FID ${fid} follows target: ${isFollowing}`);
     
