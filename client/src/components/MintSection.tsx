@@ -106,6 +106,22 @@ export function MintSection({ isEligible, hasMinted, onMintSuccess, fid }: MintS
 
       setTxHash(hash);
       setStatus("success");
+      
+      // Notify backend of successful mint
+      try {
+        await fetch("/api/mint-confirmed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            fid: userFid, 
+            walletAddress,
+            txHash: hash 
+          }),
+        });
+      } catch (error) {
+        console.warn("Failed to confirm mint on backend:", error);
+      }
+      
       onMintSuccess();
 
       toast({
