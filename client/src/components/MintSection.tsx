@@ -162,7 +162,7 @@ export function MintSection({ isEligible, hasMinted, onMintSuccess, fid }: MintS
               <span className="font-medium">SBT Minted</span>
             </div>
             <p className="text-center text-foreground font-medium">
-              شما با موفقیت وارد قرعه‌کشی شدید!
+              You've successfully entered the lottery!
             </p>
             {txHash && (
               <a
@@ -177,7 +177,7 @@ export function MintSection({ isEligible, hasMinted, onMintSuccess, fid }: MintS
               </a>
             )}
             <div className="pt-2 text-center text-sm text-muted-foreground">
-              برای قرعه‌کشی‌های بیشتر{" "}
+              Follow{" "}
               <a
                 href="https://farcaster.xyz/book"
                 target="_blank"
@@ -187,7 +187,7 @@ export function MintSection({ isEligible, hasMinted, onMintSuccess, fid }: MintS
               >
                 @book
               </a>
-              {" "}را دنبال کنید.
+              {" "}for more lotteries.
             </div>
           </div>
         ) : (
