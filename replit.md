@@ -37,10 +37,50 @@ This app allows users to:
 │   └── script/
 │       └── Deploy.s.sol       # Deployment script
 ├── server/                    # Backend Express server
-│   ├── routes.ts              # ⚠️ EDIT THIS: API routes & config
+│   ├── routes.ts              # API routes with environment var config
 │   └── storage.ts             # In-memory storage
 └── shared/
     └── schema.ts              # Shared TypeScript types
+```
+
+## Required Environment Variables
+
+Set these via Replit Secrets (Secrets tab) or `.env` file:
+
+### Critical - MUST SET
+
+```bash
+# Neynar API Key (for task verification)
+# Get from: https://neynar.com/
+NEYNAR_API_KEY=your_neynar_api_key_here
+
+# Backend Signer Private Key
+# IMPORTANT: Generate a NEW wallet address for this (not your main wallet)
+# Format: 0x followed by 64 hex characters
+SIGNER_PRIVATE_KEY=0x...
+
+# Task Configuration
+# CAST_HASH: The hash of the cast users must like/recast
+# Format: 0x followed by hex characters
+CAST_HASH=0x...
+
+# TARGET_FID: Farcaster ID users must follow
+# Get from: https://warpcast.com/~/developers/farcaster-id
+TARGET_FID=123456
+
+# Contract Addresses (after deployment on Base)
+SBT_CONTRACT_ADDRESS=0x...
+LOTTERY_CONTRACT_ADDRESS=0x...
+```
+
+### Optional (will use defaults if not set)
+
+```bash
+# Defaults to Base Mainnet (8453)
+CHAIN_ID=8453
+
+# For Base Sepolia testnet (use 84532)
+# CHAIN_ID=84532
 ```
 
 ## Configuration Files to Edit
@@ -50,35 +90,25 @@ This app allows users to:
 ```typescript
 export const APP_CONFIG = {
   // Cast to like and recast
-  castHash: "YOUR_CAST_HASH",           // Hash of your cast
+  castHash: "YOUR_CAST_HASH",           // Must match CAST_HASH env var
   castUrl: "https://warpcast.com/...",  // Full URL of your cast
   
   // Account to follow
-  targetFid: 123456,                    // Farcaster ID to follow
+  targetFid: 123456,                    // Must match TARGET_FID env var
   targetUsername: "yourhandle",         // Username for display
   
   // Contract addresses (after deployment)
-  sbtContractAddress: "0x...",
-  lotteryContractAddress: "0x...",
+  sbtContractAddress: "0x...",          // Must match SBT_CONTRACT_ADDRESS env var
+  lotteryContractAddress: "0x...",      // Must match LOTTERY_CONTRACT_ADDRESS env var
   
   // Network
   chainId: 8453,  // 8453 = Base Mainnet, 84532 = Base Sepolia
 };
 ```
 
-### 2. Backend Configuration (`server/routes.ts`)
+### 2. Farcaster Manifest (`client/public/.well-known/farcaster.json`)
 
-```typescript
-const CONFIG = {
-  NEYNAR_API_KEY: "YOUR_NEYNAR_API_KEY",    // Get from neynar.com
-  SIGNER_PRIVATE_KEY: "0x...",               // Backend signer for signatures
-  CAST_HASH: "YOUR_CAST_HASH",
-  TARGET_FID: 123456,
-  SBT_CONTRACT_ADDRESS: "0x...",
-};
-```
-
-### 3. Farcaster Manifest (`client/public/.well-known/farcaster.json`)
+After registering your app at https://warpcast.com/~/developers/mini-apps:
 
 ```json
 {
@@ -97,55 +127,73 @@ const CONFIG = {
 }
 ```
 
-## Environment Variables
+## Setup Steps
 
-Set these in your environment or `.env` file:
+### 1. Get API Keys
 
-```bash
-# Neynar API (for task verification)
-NEYNAR_API_KEY=your_neynar_api_key
+1. **Neynar API Key**:
+   - Go to https://neynar.com/
+   - Sign up and get your API key
+   - Set `NEYNAR_API_KEY` environment variable
 
-# Backend signer (generate a new wallet for this)
-SIGNER_PRIVATE_KEY=0x...
+2. **Backend Signer**:
+   - Generate a NEW wallet (use ethers.js or Remix)
+   - Export the private key
+   - Set `SIGNER_PRIVATE_KEY` environment variable
+   - **⚠️ Keep this private! Never share or commit it!**
 
-# Task configuration
-CAST_HASH=0x...
-TARGET_FID=123456
+### 2. Configure Task Details
 
-# Contract addresses (after deployment)
-SBT_CONTRACT_ADDRESS=0x...
-LOTTERY_CONTRACT_ADDRESS=0x...
-```
+1. Create or choose a cast to verify
+2. Get its hash (from cast URL or Neynar API)
+3. Choose an account to follow and get their FID
+4. Set environment variables:
+   - `CAST_HASH`
+   - `TARGET_FID`
 
-## Deployment Steps
-
-### 1. Deploy Smart Contracts
+### 3. Deploy Smart Contracts
 
 ```bash
 cd contracts
+
+# Install dependencies
 forge install OpenZeppelin/openzeppelin-contracts
-forge script script/Deploy.s.sol:DeployScript --rpc-url $BASE_RPC_URL --broadcast --verify
+
+# Deploy to Base Testnet (Sepolia)
+forge script script/Deploy.s.sol:DeployScript \
+  --rpc-url https://sepolia.base.org \
+  --broadcast
+
+# OR Deploy to Base Mainnet
+forge script script/Deploy.s.sol:DeployScript \
+  --rpc-url https://mainnet.base.org \
+  --broadcast
 ```
 
-### 2. Update Configuration
+After deployment, copy the contract addresses and set:
+- `SBT_CONTRACT_ADDRESS`
+- `LOTTERY_CONTRACT_ADDRESS`
 
-After deploying contracts:
-1. Copy contract addresses
-2. Update `client/src/lib/config.ts`
-3. Update `server/routes.ts` CONFIG
+### 4. Update Frontend Config
 
-### 3. Deploy Frontend
+Update `client/src/lib/config.ts` with:
+- Your cast hash and URL
+- Target FID and username
+- Contract addresses
+- Chain ID (8453 for Mainnet, 84532 for Sepolia)
 
-Deploy to Vercel:
+### 5. Deploy Application
+
+**For Local Development**:
 ```bash
-vercel
+npm run dev
+# App runs on http://localhost:5000
 ```
 
-### 4. Register Farcaster App
-
-1. Go to https://warpcast.com/~/developers/mini-apps
-2. Register your app
-3. Copy the account association data to `farcaster.json`
+**For Production**:
+- Deploy to Vercel, Netlify, or similar
+- Update manifest URL in `farcaster.json`
+- Register app at https://warpcast.com/~/developers/mini-apps
 
 ## Prize Tiers
 
@@ -158,29 +206,64 @@ vercel
 
 ## Security Features
 
-1. **Signature Verification**: Backend signs after verifying all tasks
-2. **Nonce Protection**: Each signature can only be used once
-3. **Soulbound Tokens**: SBTs cannot be transferred
-4. **Task Order**: Tasks must be completed in sequence
-5. **Deadline Enforcement**: Smart contract enforces lottery deadline
+✅ **Anti-Cheat Protection**:
+- All three tasks must be completed before minting
+- Backend verifies tasks via Neynar API
+- Signature verification prevents unauthorized minting
+- Each signature can only be used once (nonce protection)
+
+✅ **Soulbound Tokens**:
+- SBTs cannot be transferred (non-transferable)
+- One SBT per wallet address
+- Proves user completed all tasks
+
+✅ **Deadline Enforcement**:
+- Smart contract enforces lottery deadline
+- Prevents entry after deadline
+- Transparent on-chain
+
+## API Endpoints
+
+```
+POST /api/verify-task
+  Body: { fid: number, walletAddress: string, taskType: "like" | "recast" | "follow" }
+  Returns: { success: boolean, message: string }
+
+POST /api/mint-signature
+  Body: { fid: number, walletAddress: string }
+  Returns: { success: boolean, signature: string, nonce: number }
+
+GET /api/lottery-stats
+  Returns: { totalParticipants: number, currentTier: {...}, deadline: number, isActive: boolean }
+
+GET /api/user-progress
+  Query: ?walletAddress=0x...
+  Returns: { fid: number, tasks: {...}, allTasksCompleted: boolean, hasMinted: boolean }
+```
 
 ## Development
 
 ```bash
-# Install dependencies
+# Install dependencies (already done)
 npm install
 
 # Start development server
 npm run dev
+
+# Server runs on http://localhost:5000
+# Frontend hot-reloads on changes
 ```
 
 ## Recent Changes
 
-- Initial implementation with React frontend
-- Farcaster SDK integration
-- Smart contracts for SBT and Lottery
-- Neynar API integration for task verification
-- Admin panel for lottery execution
+- ✅ Fixed fid validation in mint signature endpoint
+- ✅ Updated MintSection to send fid with wallet address
+- ✅ Proper environment variable validation with warnings
+- ✅ Anti-cheat checks in backend
+- ✅ Purple-themed UI matching Farcaster branding
+- ✅ Task verification with Neynar API integration
+- ✅ Complete lottery statistics display
+- ✅ Admin panel for lottery execution
 
 ## User Preferences
 
@@ -188,3 +271,25 @@ npm run dev
 - Backend: Express.js
 - Smart contracts: Foundry (Solidity)
 - Network: Base (L2)
+- Design: Material Design 3 with purple theme
+- Data: In-memory storage (can be upgraded to database)
+
+## Troubleshooting
+
+### "NEYNAR_API_KEY not configured" error
+→ Set the `NEYNAR_API_KEY` environment variable in Replit Secrets
+
+### "SIGNER_PRIVATE_KEY not configured" error
+→ Generate a private key and set `SIGNER_PRIVATE_KEY` environment variable
+
+### Task verification failing
+→ Verify your `CAST_HASH` and `TARGET_FID` are correct
+→ Check Neynar API key has correct permissions
+
+### Mint signature failing
+→ Ensure all three tasks are marked as completed
+→ Check that wallet address is provided
+
+### Contract deployment failing
+→ Ensure you have ETH for gas on Base network
+→ Use correct RPC URL for your target network
