@@ -9,7 +9,7 @@ export const APP_CONFIG = {
   
   // Cast URL for display (clickable link)
   // Change this to the full URL of your cast
-  castUrl: "https://farcaster.xyz/hossein2001/0x28a80f62",
+  castUrl: "https://farcaster.com/hossein2001/0x28a80f62",
   
   // Account to follow
   // Change this to the Farcaster ID (FID) of the account users should follow
