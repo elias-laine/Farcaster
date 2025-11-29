@@ -359,10 +359,8 @@ async function verifyLike(fid: number, castHash: string): Promise<boolean> {
     const data = await response.json();
     console.log("[verifyLike] API Response:", JSON.stringify(data, null, 2));
     
-    const reactions = data.cast?.reactions?.likes || [];
-    console.log("[verifyLike] Likes found:", reactions.length);
-    
-    const hasLiked = reactions.some((like: { fid: number }) => like.fid === fid);
+    // Check viewer_context.liked - this indicates if the current viewer liked the cast
+    const hasLiked = data.cast?.viewer_context?.liked === true;
     console.log(`[verifyLike] FID ${fid} has liked: ${hasLiked}`);
     
     return hasLiked;
@@ -396,10 +394,9 @@ async function verifyRecast(fid: number, castHash: string): Promise<boolean> {
     }
 
     const data = await response.json();
-    const recasts = data.cast?.reactions?.recasts || [];
-    console.log("[verifyRecast] Recasts found:", recasts.length);
     
-    const hasRecasted = recasts.some((recast: { fid: number }) => recast.fid === fid);
+    // Check viewer_context.recasted - this indicates if the current viewer recasted the cast
+    const hasRecasted = data.cast?.viewer_context?.recasted === true;
     console.log(`[verifyRecast] FID ${fid} has recasted: ${hasRecasted}`);
     
     return hasRecasted;

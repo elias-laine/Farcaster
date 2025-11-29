@@ -1,0 +1,437 @@
+
+Search
+
+Live tail
+GMT+3:30
+
+Menu
+
+[verifyLike] Checking FID 14675 for cast 0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6
+[verifyLike] Using API Key: YES
+[verifyLike] Fetching from: https://api.neynar.com/v2/farcaster/cast?identifier=0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6&type=hash&viewer_fid=14675
+[verifyLike] Response status: 200
+[verifyLike] API Response: {
+  "cast": {
+    "object": "cast",
+    "hash": "0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6",
+    "author": {
+      "object": "user",
+      "fid": 958667,
+      "username": "hossein2001",
+      "display_name": "Hossein",
+      "pfp_url": "https://imagedelivery.net/BXluQx4ige9GuW0Ia56BHw/848486c2-b6a9-46c6-7a54-e0d8addbc400/rectcrop3",
+      "custody_address": "0x97261932196dc5587d1d892016f20c18a45a66f2",
+      "profile": {
+        "bio": {
+          "text": ""
+        }
+      },
+      "follower_count": 0,
+      "following_count": 6,
+      "verifications": [],
+      "verified_addresses": {
+        "eth_addresses": [],
+        "sol_addresses": [],
+        "primary": {
+          "eth_address": null,
+          "sol_address": null
+        }
+      },
+      "auth_addresses": [],
+      "verified_accounts": [
+        {
+          "platform": "x",
+          "username": "kermani1crypto"
+        }
+      ],
+      "viewer_context": {
+        "following": false,
+        "followed_by": true,
+        "blocking": false,
+        "blocked_by": false
+      },
+      "experimental": {
+        "neynar_user_score": 0.6,
+        "deprecation_notice": "The `neynar_user_score` field under `experimental` will be deprecated after June 1, 2025, as it will be formally promoted to a stable field named `score` within the user object."
+      },
+      "score": 0.6
+    },
+    "app": {
+      "object": "user_dehydrated",
+      "fid": 9152,
+      "username": "warpcast",
+      "display_name": "Warpcast",
+      "pfp_url": "https://i.imgur.com/3d6fFAI.png",
+      "custody_address": "0x02ef790dd7993a35fd847c053eddae940d055596"
+    },
+    "thread_hash": "0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6",
+    "parent_hash": null,
+    "parent_url": null,
+    "root_parent_url": null,
+    "parent_author": {
+      "fid": null
+    },
+    "text": "Something is coming...",
+    "timestamp": "2025-11-29T18:05:16.000Z",
+    "embeds": [],
+    "channel": null,
+    "reactions": {
+      "likes_count": 1,
+      "recasts_count": 1,
+      "likes": [],
+      "recasts": []
+    },
+    "replies": {
+      "count": 0
+    },
+    "mentioned_profiles": [],
+    "mentioned_profiles_ranges": [],
+    "mentioned_channels": [],
+    "mentioned_channels_ranges": [],
+    "viewer_context": {
+      "liked": true,
+      "recasted": true
+    }
+  }
+}
+[verifyLike] Likes found: 0
+[verifyLike] FID 14675 has liked: false
+7:14:57 PM [express] POST /api/verify-task 200 in 99ms :: {"success":false,"message":"Cast not liked yet. Please like the cast first."}
+==> Downloading cache...
+==> It looks like we don't have access to your repo, but we'll try to clone it anyway.
+==> Cloning from https://github.com/kermanicrypto/Farcaster
+==> Checking out commit cc9c9cd021a1aa1d0a5a44ecc9eb04ff86c761c8 in branch main
+==> Downloaded 240MB in 2s. Extraction took 6s.
+==> Using Node.js version 22.16.0 (default)
+==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+==> Running build command 'npm install; npm run build'...
+up to date, audited 552 packages in 2s
+87 packages are looking for funding
+  run `npm fund` for details
+9 vulnerabilities (3 low, 5 moderate, 1 high)
+To address issues that do not require attention, run:
+  npm audit fix
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+Run `npm audit` for details.
+> rest-express@1.0.0 build
+> tsx script/build.ts
+building client...
+vite v5.4.20 building for production...
+transforming...
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+node_modules/ox/_esm/core/Address.js (6:21): A comment
+"/*#__PURE__*/"
+in "node_modules/ox/_esm/core/Address.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/ox/_esm/core/Json.js (1:21): A comment
+"/*#__PURE__*/"
+in "node_modules/ox/_esm/core/Json.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2344 modules transformed.
+rendering chunks...
+computing gzip size...
+../dist/public/index.html                   1.22 kB │ gzip:   0.58 kB
+../dist/public/assets/index-DZtzVbRw.css   72.56 kB │ gzip:  11.70 kB
+../dist/public/assets/index-ChFYLCfE.js   673.78 kB │ gzip: 207.02 kB
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.83s
+building server...
+  dist/index.cjs  1.3mb ⚠️
+⚡ Done in 221ms
+==> Uploading build...
+==> Uploaded in 5.4s. Compression took 4.3s
+==> Build successful 🎉
+==> Deploying...
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.cjs
+[CONFIG] NEYNAR_API_KEY exists: true
+[CONFIG] CAST_HASH: 0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6
+[CONFIG] TARGET_FID: 958667
+[CONFIG] SIGNER_PRIVATE_KEY exists: true
+[static] Serving from: /opt/render/project/src/dist/public
+7:14:16 PM [express] serving on port 10000
+==> Your service is live 🎉
+==> 
+==> ///////////////////////////////////////////////////////////
+==> 
+==> Available at your primary URL https://farcaster-geut.onrender.com
+==> 
+==> ///////////////////////////////////////////////////////////
+7:14:50 PM [express] GET /api/lottery-stats 200 in 2ms :: {"totalParticipants":0,"currentTier":{"minParticipants":0,"maxParticipants":99,"winnersCount":1,"prizePerWinner":5,"totalPrize":5},"deadline":1765048456,"isActive":true}
+7:14:50 PM [express] GET /api/user-progress 304 in 1ms :: {"fid":14675,"walletAddress":"0xf33afadb48671d6c99fcff9b756660e50ede6420","tasks":[{"type":"like","status":"pending"},{"type":"recast","status":"pending"},{"type":"follow","status":"pending"}],"allTasksCompleted":false,"signatureIssued":false}
+[verifyLike] Checking FID 14675 for cast 0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6
+[verifyLike] Using API Key: YES
+[verifyLike] Fetching from: https://api.neynar.com/v2/farcaster/cast?identifier=0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6&type=hash&viewer_fid=14675
+[verifyLike] Response status: 200
+[verifyLike] API Response: {
+  "cast": {
+    "object": "cast",
+    "hash": "0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6",
+    "author": {
+      "object": "user",
+      "fid": 958667,
+      "username": "hossein2001",
+      "display_name": "Hossein",
+      "pfp_url": "https://imagedelivery.net/BXluQx4ige9GuW0Ia56BHw/848486c2-b6a9-46c6-7a54-e0d8addbc400/rectcrop3",
+      "custody_address": "0x97261932196dc5587d1d892016f20c18a45a66f2",
+      "profile": {
+        "bio": {
+          "text": ""
+        }
+      },
+      "follower_count": 0,
+      "following_count": 6,
+      "verifications": [],
+      "verified_addresses": {
+        "eth_addresses": [],
+        "sol_addresses": [],
+        "primary": {
+          "eth_address": null,
+          "sol_address": null
+        }
+      },
+      "auth_addresses": [],
+      "verified_accounts": [
+        {
+          "platform": "x",
+          "username": "kermani1crypto"
+        }
+      ],
+      "viewer_context": {
+        "following": false,
+        "followed_by": true,
+        "blocking": false,
+        "blocked_by": false
+      },
+      "experimental": {
+        "neynar_user_score": 0.6,
+        "deprecation_notice": "The `neynar_user_score` field under `experimental` will be deprecated after June 1, 2025, as it will be formally promoted to a stable field named `score` within the user object."
+      },
+      "score": 0.6
+    },
+    "app": {
+      "object": "user_dehydrated",
+      "fid": 9152,
+      "username": "warpcast",
+      "display_name": "Warpcast",
+      "pfp_url": "https://i.imgur.com/3d6fFAI.png",
+      "custody_address": "0x02ef790dd7993a35fd847c053eddae940d055596"
+    },
+    "thread_hash": "0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6",
+    "parent_hash": null,
+    "parent_url": null,
+    "root_parent_url": null,
+    "parent_author": {
+      "fid": null
+    },
+    "text": "Something is coming...",
+    "timestamp": "2025-11-29T18:05:16.000Z",
+    "embeds": [],
+    "channel": null,
+    "reactions": {
+      "likes_count": 1,
+      "recasts_count": 1,
+      "likes": [],
+      "recasts": []
+    },
+    "replies": {
+      "count": 0
+    },
+    "mentioned_profiles": [],
+    "mentioned_profiles_ranges": [],
+    "mentioned_channels": [],
+    "mentioned_channels_ranges": [],
+    "viewer_context": {
+      "liked": true,
+      "recasted": true
+    }
+  }
+}
+[verifyLike] Likes found: 0
+[verifyLike] FID 14675 has liked: false
+7:14:54 PM [express] POST /api/verify-task 200 in 607ms :: {"success":false,"message":"Cast not liked yet. Please like the cast first."}
+[verifyLike] Checking FID 14675 for cast 0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6
+[verifyLike] Using API Key: YES
+[verifyLike] Fetching from: https://api.neynar.com/v2/farcaster/cast?identifier=0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6&type=hash&viewer_fid=14675
+[verifyLike] Response status: 200
+[verifyLike] API Response: {
+  "cast": {
+    "object": "cast",
+    "hash": "0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6",
+    "author": {
+      "object": "user",
+      "fid": 958667,
+      "username": "hossein2001",
+      "display_name": "Hossein",
+      "pfp_url": "https://imagedelivery.net/BXluQx4ige9GuW0Ia56BHw/848486c2-b6a9-46c6-7a54-e0d8addbc400/rectcrop3",
+      "custody_address": "0x97261932196dc5587d1d892016f20c18a45a66f2",
+      "profile": {
+        "bio": {
+          "text": ""
+        }
+      },
+      "follower_count": 0,
+      "following_count": 6,
+      "verifications": [],
+      "verified_addresses": {
+        "eth_addresses": [],
+        "sol_addresses": [],
+        "primary": {
+          "eth_address": null,
+          "sol_address": null
+        }
+      },
+      "auth_addresses": [],
+      "verified_accounts": [
+        {
+          "platform": "x",
+          "username": "kermani1crypto"
+        }
+      ],
+      "viewer_context": {
+        "following": false,
+        "followed_by": true,
+        "blocking": false,
+        "blocked_by": false
+      },
+      "experimental": {
+        "neynar_user_score": 0.6,
+        "deprecation_notice": "The `neynar_user_score` field under `experimental` will be deprecated after June 1, 2025, as it will be formally promoted to a stable field named `score` within the user object."
+      },
+      "score": 0.6
+    },
+    "app": {
+      "object": "user_dehydrated",
+      "fid": 9152,
+      "username": "warpcast",
+      "display_name": "Warpcast",
+      "pfp_url": "https://i.imgur.com/3d6fFAI.png",
+      "custody_address": "0x02ef790dd7993a35fd847c053eddae940d055596"
+    },
+    "thread_hash": "0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6",
+    "parent_hash": null,
+    "parent_url": null,
+    "root_parent_url": null,
+    "parent_author": {
+      "fid": null
+    },
+    "text": "Something is coming...",
+    "timestamp": "2025-11-29T18:05:16.000Z",
+    "embeds": [],
+    "channel": null,
+    "reactions": {
+      "likes_count": 1,
+      "recasts_count": 1,
+      "likes": [],
+      "recasts": []
+    },
+    "replies": {
+      "count": 0
+    },
+    "mentioned_profiles": [],
+    "mentioned_profiles_ranges": [],
+    "mentioned_channels": [],
+    "mentioned_channels_ranges": [],
+    "viewer_context": {
+      "liked": true,
+      "recasted": true
+    }
+  }
+}
+[verifyLike] Likes found: 0
+[verifyLike] FID 14675 has liked: false
+7:14:57 PM [express] POST /api/verify-task 200 in 99ms :: {"success":false,"message":"Cast not liked yet. Please like the cast first."}
+[verifyLike] Checking FID 14675 for cast 0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6
+[verifyLike] Using API Key: YES
+[verifyLike] Fetching from: https://api.neynar.com/v2/farcaster/cast?identifier=0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6&type=hash&viewer_fid=14675
+[verifyLike] Response status: 200
+[verifyLike] API Response: {
+  "cast": {
+    "object": "cast",
+    "hash": "0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6",
+    "author": {
+      "object": "user",
+      "fid": 958667,
+      "username": "hossein2001",
+      "display_name": "Hossein",
+      "pfp_url": "https://imagedelivery.net/BXluQx4ige9GuW0Ia56BHw/848486c2-b6a9-46c6-7a54-e0d8addbc400/rectcrop3",
+      "custody_address": "0x97261932196dc5587d1d892016f20c18a45a66f2",
+      "profile": {
+        "bio": {
+          "text": ""
+        }
+      },
+      "follower_count": 0,
+      "following_count": 6,
+      "verifications": [],
+      "verified_addresses": {
+        "eth_addresses": [],
+        "sol_addresses": [],
+        "primary": {
+          "eth_address": null,
+          "sol_address": null
+        }
+      },
+      "auth_addresses": [],
+      "verified_accounts": [
+        {
+          "platform": "x",
+          "username": "kermani1crypto"
+        }
+      ],
+      "viewer_context": {
+        "following": false,
+        "followed_by": true,
+        "blocking": false,
+        "blocked_by": false
+      },
+      "experimental": {
+        "neynar_user_score": 0.6,
+        "deprecation_notice": "The `neynar_user_score` field under `experimental` will be deprecated after June 1, 2025, as it will be formally promoted to a stable field named `score` within the user object."
+      },
+      "score": 0.6
+    },
+    "app": {
+      "object": "user_dehydrated",
+      "fid": 9152,
+      "username": "warpcast",
+      "display_name": "Warpcast",
+      "pfp_url": "https://i.imgur.com/3d6fFAI.png",
+      "custody_address": "0x02ef790dd7993a35fd847c053eddae940d055596"
+    },
+    "thread_hash": "0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6",
+    "parent_hash": null,
+    "parent_url": null,
+    "root_parent_url": null,
+    "parent_author": {
+      "fid": null
+    },
+    "text": "Something is coming...",
+    "timestamp": "2025-11-29T18:05:16.000Z",
+    "embeds": [],
+    "channel": null,
+    "reactions": {
+      "likes_count": 1,
+      "recasts_count": 1,
+      "likes": [],
+      "recasts": []
+    },
+    "replies": {
+      "count": 0
+    },
+    "mentioned_profiles": [],
+    "mentioned_profiles_ranges": [],
+    "mentioned_channels": [],
+    "mentioned_channels_ranges": [],
+    "viewer_context": {
+      "liked": true,
+      "recasted": true
+    }
+  }
+}
+[verifyLike] Likes found: 0
+[verifyLike] FID 14675 has liked: false
+7:14:59 PM [express] POST /api/verify-task 200 in 96ms :: {"success":false,"message":"Cast not liked yet. Please like the cast first."}
