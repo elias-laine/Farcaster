@@ -182,11 +182,11 @@ export default function Home() {
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
         {/* Hero Section */}
         <section className="text-center space-y-4" data-testid="section-hero">
-          <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 mx-auto">
-            <Zap className="h-8 w-8 text-primary" />
+          <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 mx-auto">
+            <Zap className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Complete Tasks, Win Prizes</h1>
+            <h1 className="text-2xl font-bold text-foreground">Complete Tasks, Win Prizes</h1>
             <p className="text-muted-foreground mt-2 max-w-lg mx-auto">
               Complete three simple social tasks, mint your SBT, and enter the lottery for a chance to win up to $5!
             </p>
