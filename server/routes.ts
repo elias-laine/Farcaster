@@ -32,6 +32,15 @@ const CONFIG = {
   
   // SBT contract address (for signature verification)
   SBT_CONTRACT_ADDRESS: process.env.SBT_CONTRACT_ADDRESS || "",
+  
+  // Lottery contract address (to read stats from blockchain)
+  LOTTERY_CONTRACT_ADDRESS: process.env.LOTTERY_CONTRACT_ADDRESS || "",
+  
+  // RPC URL for blockchain queries (Base Mainnet or Sepolia)
+  RPC_URL: process.env.RPC_URL || "https://mainnet.base.org",
+  
+  // Chain ID (8453 = Base Mainnet, 84532 = Base Sepolia)
+  CHAIN_ID: parseInt(process.env.CHAIN_ID || "8453"),
 };
 
 // Debug log config
@@ -39,9 +48,37 @@ console.log("[CONFIG] NEYNAR_API_KEY exists:", !!CONFIG.NEYNAR_API_KEY);
 console.log("[CONFIG] CAST_HASH:", CONFIG.CAST_HASH);
 console.log("[CONFIG] TARGET_FID:", CONFIG.TARGET_FID);
 console.log("[CONFIG] SIGNER_PRIVATE_KEY exists:", !!CONFIG.SIGNER_PRIVATE_KEY);
+console.log("[CONFIG] LOTTERY_CONTRACT_ADDRESS:", CONFIG.LOTTERY_CONTRACT_ADDRESS);
+console.log("[CONFIG] RPC_URL:", CONFIG.RPC_URL);
 
 // Neynar API base URL
 const NEYNAR_API_URL = "https://api.neynar.com/v2/farcaster";
+
+// Lottery Contract ABI (minimal - only what we need)
+const LOTTERY_CONTRACT_ABI = [
+  {
+    name: "getLotteryStats",
+    type: "function",
+    inputs: [],
+    outputs: [
+      { name: "totalParticipants", type: "uint256" },
+      { name: "currentWinnersCount", type: "uint256" },
+      { name: "currentPrizePerWinner", type: "uint256" },
+      { name: "currentTotalPrize", type: "uint256" },
+      { name: "lotteryDeadline", type: "uint256" },
+      { name: "active", type: "bool" },
+      { name: "executed", type: "bool" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    name: "getWinners",
+    type: "function",
+    inputs: [],
+    outputs: [{ name: "", type: "address[]" }],
+    stateMutability: "view",
+  },
+] as const;
 
 export async function registerRoutes(
   httpServer: Server,
@@ -260,10 +297,21 @@ export async function registerRoutes(
   });
 
   // ============================================
-  // GET LOTTERY STATS
+  // GET LOTTERY STATS (from Smart Contract or fallback to storage)
   // ============================================
   app.get("/api/lottery-stats", async (req, res) => {
     try {
+      // Try to fetch from blockchain first if contract address is set
+      if (CONFIG.LOTTERY_CONTRACT_ADDRESS) {
+        try {
+          const blockchainStats = await getLotteryStatsFromBlockchain();
+          return res.json(blockchainStats);
+        } catch (error) {
+          console.warn("Failed to fetch from blockchain, falling back to local storage:", error);
+        }
+      }
+      
+      // Fallback to local storage
       const stats = await storage.getLotteryStats();
       return res.json(stats);
     } catch (error) {
@@ -321,6 +369,78 @@ export async function registerRoutes(
   });
 
   return httpServer;
+}
+
+// ============================================
+// BLOCKCHAIN FUNCTIONS - Read Lottery Stats from Smart Contract
+// ============================================
+
+async function getLotteryStatsFromBlockchain() {
+  if (!CONFIG.LOTTERY_CONTRACT_ADDRESS) {
+    throw new Error("Lottery contract address not configured");
+  }
+
+  try {
+    const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
+    const contract = new ethers.Contract(
+      CONFIG.LOTTERY_CONTRACT_ADDRESS,
+      LOTTERY_CONTRACT_ABI,
+      provider
+    );
+
+    console.log("[Blockchain] Fetching lottery stats from contract:", CONFIG.LOTTERY_CONTRACT_ADDRESS);
+
+    // Call getLotteryStats
+    const [
+      totalParticipants,
+      currentWinnersCount,
+      currentPrizePerWinner,
+      currentTotalPrize,
+      lotteryDeadline,
+      active,
+      executed,
+    ] = await contract.getLotteryStats();
+
+    // Get winners if lottery is executed
+    let winners: string[] | undefined;
+    if (executed) {
+      try {
+        winners = await contract.getWinners();
+        if (winners) {
+          console.log("[Blockchain] Winners count:", winners.length);
+        }
+      } catch (e) {
+        console.warn("[Blockchain] Could not fetch winners:", e);
+      }
+    }
+
+    const currentTier = {
+      minParticipants: 0,
+      maxParticipants: undefined,
+      winnersCount: Number(currentWinnersCount),
+      prizePerWinner: Number(currentPrizePerWinner),
+      totalPrize: Number(currentTotalPrize),
+    };
+
+    const stats = {
+      totalParticipants: Number(totalParticipants),
+      currentTier,
+      deadline: Number(lotteryDeadline),
+      isActive: active,
+      winners: winners && winners.length > 0 ? winners : undefined,
+    };
+
+    console.log("[Blockchain] Stats retrieved successfully:", {
+      participants: stats.totalParticipants,
+      deadline: new Date(stats.deadline * 1000).toISOString(),
+      winners: winners?.length || 0,
+    });
+
+    return stats;
+  } catch (error) {
+    console.error("[Blockchain] Error fetching stats:", error);
+    throw error;
+  }
 }
 
 // ============================================
