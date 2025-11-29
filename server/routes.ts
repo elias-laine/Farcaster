@@ -323,6 +323,8 @@ export async function registerRoutes(
 
 async function verifyLike(fid: number, castHash: string): Promise<boolean> {
   try {
+    console.log(`[verifyLike] Checking FID ${fid} for cast ${castHash}`);
+    
     const response = await fetch(
       `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash`,
       {
@@ -333,14 +335,21 @@ async function verifyLike(fid: number, castHash: string): Promise<boolean> {
     );
 
     if (!response.ok) {
-      console.error("Neynar API error:", await response.text());
+      const errorText = await response.text();
+      console.error("Neynar API error:", errorText);
       return false;
     }
 
     const data = await response.json();
-    const reactions = data.cast?.reactions?.likes || [];
+    console.log("[verifyLike] API Response:", JSON.stringify(data, null, 2));
     
-    return reactions.some((like: { fid: number }) => like.fid === fid);
+    const reactions = data.cast?.reactions?.likes || [];
+    console.log("[verifyLike] Likes:", reactions);
+    
+    const hasLiked = reactions.some((like: { fid: number }) => like.fid === fid);
+    console.log(`[verifyLike] FID ${fid} has liked: ${hasLiked}`);
+    
+    return hasLiked;
   } catch (error) {
     console.error("Error verifying like:", error);
     return false;
