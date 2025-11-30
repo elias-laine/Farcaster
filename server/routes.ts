@@ -525,17 +525,15 @@ async function getLotteryStatsFromBlockchain() {
       executed,
     ] = await contract.getLotteryStats();
 
-    // Get winners if lottery is executed
+    // Always try to get winners (even if not executed yet)
     let winners: string[] | undefined;
-    if (executed) {
-      try {
-        winners = await contract.getWinners();
-        if (winners) {
-          console.log("[Blockchain] Winners count:", winners.length);
-        }
-      } catch (e) {
-        console.warn("[Blockchain] Could not fetch winners:", e);
+    try {
+      winners = await contract.getWinners();
+      if (winners && winners.length > 0) {
+        console.log("[Blockchain] Winners count:", winners.length);
       }
+    } catch (e) {
+      console.warn("[Blockchain] Could not fetch winners:", e);
     }
 
     const currentTier = {
