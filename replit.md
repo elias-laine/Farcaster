@@ -1,13 +1,14 @@
 # Social Quest - Farcaster Mini App
 
-A Farcaster Mini App for social task campaigns with SBT minting and lottery system on Base network.
+A Farcaster Mini App for social task campaigns with SBT minting and decentralized lottery system on Base network with **automatic prize distribution**.
 
 ## Overview
 
 This app allows users to:
 1. Complete three social tasks (like, recast, follow)
 2. Mint a Soulbound Token (SBT) as proof of completion
-3. Enter a lottery with tiered prizes based on participant count
+3. Enter a decentralized lottery with tiered prizes based on participant count
+4. **Automatic prize distribution to winners after lottery execution**
 
 ## Project Structure
 
@@ -33,7 +34,7 @@ This app allows users to:
 ├── contracts/                 # Solidity smart contracts (Foundry)
 │   ├── src/
 │   │   ├── SocialQuestSBT.sol     # Soulbound Token contract
-│   │   └── SocialQuestLottery.sol # Lottery contract
+│   │   └── SocialQuestLottery.sol # Lottery contract with auto prize distribution
 │   └── script/
 │       └── Deploy.s.sol       # Deployment script
 ├── server/                    # Backend Express server
@@ -160,6 +161,11 @@ cd contracts
 # Install dependencies
 forge install OpenZeppelin/openzeppelin-contracts
 
+# Set environment variables for deployment
+export SIGNER_ADDRESS=0x...  # Your signer wallet
+export LOTTERY_DEADLINE=1764547200  # Timestamp in seconds
+export BASE_URI=https://your-metadata-url/
+
 # Deploy to Base Testnet (Sepolia)
 forge script script/Deploy.s.sol:DeployScript \
   --rpc-url https://sepolia.base.org \
@@ -171,11 +177,22 @@ forge script script/Deploy.s.sol:DeployScript \
   --broadcast
 ```
 
-After deployment, copy the contract addresses and set:
+**After deployment, copy the contract addresses and set:**
 - `SBT_CONTRACT_ADDRESS`
 - `LOTTERY_CONTRACT_ADDRESS`
 
-### 4. Update Frontend Config
+### 4. Fund the Lottery
+
+After deployment, send ETH to the lottery contract address:
+```bash
+# Send funds directly to LOTTERY_CONTRACT_ADDRESS
+# Example: Send 1 ETH to cover prizes
+# The address that sends ETH will be recorded as the depositor
+```
+
+The funds will be held by the contract and automatically distributed when the lottery is executed.
+
+### 5. Update Frontend Config
 
 Update `client/src/lib/config.ts` with:
 - Your cast hash and URL
@@ -183,7 +200,7 @@ Update `client/src/lib/config.ts` with:
 - Contract addresses
 - Chain ID (8453 for Mainnet, 84532 for Sepolia)
 
-### 5. Deploy Application
+### 6. Deploy Application
 
 **For Local Development**:
 ```bash
@@ -200,10 +217,29 @@ npm run dev
 
 | Participants | Winners | Prize/Winner | Total Prize |
 |-------------|---------|--------------|-------------|
-| < 100       | 1       | $5           | $5          |
-| 100-499     | 2       | $10          | $20         |
-| 500-999     | 3       | $15          | $45         |
-| 1000+       | 4       | $20          | $80         |
+| < 100       | 1       | $5 (5 ether) | $5          |
+| 100-499     | 2       | $5 (5 ether) | $10         |
+| 500-999     | 3       | $5 (5 ether) | $15         |
+| 1000+       | 4       | $5 (5 ether) | $20         |
+
+## How Automatic Prize Distribution Works
+
+### 1. Funding Phase
+- After deployment, send ETH directly to the lottery contract (via `receive()` function)
+- The address that sends funds is recorded as the **depositor**
+- Example: Send 1 ETH to cover 20 winners × $5 each
+
+### 2. Lottery Execution Phase
+- After deadline passes, owner calls `executeLottery()`
+- Contract automatically:
+  1. Selects random winners from participants
+  2. **Transfers prize amount to each winner's wallet**
+  3. **Returns remaining funds to the original depositor**
+
+### 3. Transparency
+- All transactions are on-chain and visible on block explorer
+- Winners can verify their prize transfers immediately
+- Depositor can verify refund of unused funds
 
 ## Security Features
 
@@ -221,12 +257,23 @@ npm run dev
 ✅ **Deadline Enforcement**:
 - Smart contract enforces lottery deadline
 - Prevents entry after deadline
-- Transparent on-chain
+- **Immutable deadline** - cannot be changed
+
+✅ **Automatic Prize Distribution**:
+- Prizes automatically sent to winners on `executeLottery()`
+- Remaining funds automatically refunded to depositor
+- No owner withdrawal capabilities - fully transparent
 
 ✅ **On-Chain Verification**:
 - MintSection checks blockchain to verify if wallet already has SBT
 - Admin page fetches participants from smart contract
-- Fallback to local storage if contract address not set
+- Winners list stored on-chain and transparent
+
+✅ **Immutable Parameters**:
+- Signer address: **immutable** (cannot be changed)
+- Lottery contract: **immutable** (cannot be changed)
+- SBT contract: **immutable** (cannot be changed)
+- Deadline: **immutable** (cannot be changed)
 
 ## API Endpoints
 
@@ -269,13 +316,13 @@ npm run dev
 
 ## Recent Changes
 
-- ✅ Fixed admin participants list - now fetches from blockchain when LOTTERY_CONTRACT_ADDRESS is set
-- ✅ MintSection now checks on-chain if wallet has already minted SBT
-- ✅ Reduced timer size (text-2xl → text-lg) to prevent line wrapping
-- ✅ Improved date/time display format to fit in one line
-- ✅ Added balanceOf function to check on-chain mint status
-- ✅ Admin page participants endpoint removed wallet requirement
-- ✅ Post-mint UX: replaced mint button with success message and @book follow link
+- ✅ **Automatic prize distribution** - Prizes sent to winners automatically on `executeLottery()`
+- ✅ **Remaining funds refund** - Leftover funds returned to depositor automatically
+- ✅ **Immutable contracts** - All critical parameters now immutable for user trust
+- ✅ Fixed admin participants list - now fetches from blockchain
+- ✅ MintSection checks on-chain if wallet has already minted SBT
+- ✅ Reduced timer size (text-2xl → text-lg)
+- ✅ Improved date/time display format
 
 ## User Preferences
 
@@ -311,9 +358,12 @@ npm run dev
 ### Participants list empty on admin page
 → Ensure `LOTTERY_CONTRACT_ADDRESS` environment variable is set
 → Verify users have minted SBTs on the blockchain
-→ If not using blockchain, users must complete mint flow on this app
+
+### Prize distribution not working
+→ Ensure lottery contract has sufficient ETH balance
+→ Verify deadline has passed before executing lottery
+→ Check that participants list is not empty
 
 ### MintSection not showing correct status
 → Check that `SBT_CONTRACT_ADDRESS` is set in config
 → Verify RPC endpoint is working (`rpcUrl` in config)
-→ On-chain check uses `balanceOf` to verify SBT ownership

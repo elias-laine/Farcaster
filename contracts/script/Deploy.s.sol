@@ -16,24 +16,24 @@ contract DeployScript is Script {
         
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy Lottery contract first
-        SocialQuestLottery lottery = new SocialQuestLottery(deadline);
+        // Deploy Lottery contract first (SBT address will be set after SBT deployment)
+        SocialQuestLottery lottery = new SocialQuestLottery(deadline, address(0));
         console.log("Lottery deployed at:", address(lottery));
 
-        // Deploy SBT contract
+        // Deploy SBT contract with lottery address
         SocialQuestSBT sbt = new SocialQuestSBT(
             signer,
+            address(lottery),
             "Social Quest SBT",
             "SQSBT",
             baseURI
         );
         console.log("SBT deployed at:", address(sbt));
 
-        // Link contracts
-        sbt.setLotteryContract(address(lottery));
-        lottery.setSBTContract(address(sbt));
-        
-        console.log("Contracts linked successfully");
+        console.log("Contracts deployed successfully!");
+        console.log("Save these addresses:");
+        console.log("SBT_CONTRACT_ADDRESS:", address(sbt));
+        console.log("LOTTERY_CONTRACT_ADDRESS:", address(lottery));
 
         vm.stopBroadcast();
     }

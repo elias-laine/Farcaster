@@ -7,8 +7,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 /**
  * @title SocialQuestLottery
  * @dev Lottery contract for Social Quest campaign with tiered prizes
- * @notice Manages participant registration and random winner selection
- * @notice ✅ AUDIT SAFE: Immutable parameters and strict fund controls
+ * @notice Manages participant registration and automatic prize distribution
+ * @notice ✅ AUDIT SAFE: Prizes are automatically distributed to winners
  */
 contract SocialQuestLottery is Ownable, ReentrancyGuard {
     // Struct for prize tier
@@ -28,6 +28,9 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
     // SBT contract address - IMMUTABLE for security
     address public immutable sbtContract;
 
+    // Depositor address (who funded the lottery)
+    address public depositor;
+
     // Array of participants
     address[] public participants;
 
@@ -43,6 +46,9 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
     // Mapping to track if address won
     mapping(address => bool) public isWinner;
 
+    // Mapping to track prize claimed by winners
+    mapping(address => bool) public prizeClaimed;
+
     // Lottery status
     bool public isActive = true;
     bool public isExecuted = false;
@@ -50,9 +56,9 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
     // Events
     event ParticipantRegistered(address indexed participant, uint256 indexed index, uint256 timestamp);
     event LotteryExecuted(address[] winners, uint256 prizePerWinner, uint256 timestamp);
-    event SBTContractUpdated(address indexed oldContract, address indexed newContract);
     event FundsDeposited(address indexed from, uint256 amount);
-    event FundsWithdrawn(address indexed to, uint256 amount);
+    event PrizeDistributed(address indexed winner, uint256 amount);
+    event RemainingFundsReturned(address indexed depositor, uint256 amount);
 
     // Errors
     error LotteryNotActive();
@@ -64,6 +70,9 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
     error NoParticipants();
     error ZeroAddress();
     error InvalidDeadline();
+    error InsufficientFunds();
+    error NoRemainingFunds();
+    error TransferFailed();
 
     constructor(
         uint256 _deadline,
@@ -110,6 +119,17 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @dev Receive ETH for prize pool
+     * @notice Stores the depositor address for later refund of remaining funds
+     */
+    receive() external payable {
+        if (depositor == address(0)) {
+            depositor = msg.sender;
+        }
+        emit FundsDeposited(msg.sender, msg.value);
+    }
+
+    /**
      * @dev Register a participant (called by SBT contract when minting)
      * @param participant Address of the participant
      */
@@ -127,9 +147,9 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Execute the lottery and select winners
+     * @dev Execute the lottery, select winners, and distribute prizes
      * @notice Can only be called after deadline by owner
-     * @notice Winners are selected on-chain but no funds are transferred (decentralized)
+     * @notice Automatically distributes prizes to winners and returns remaining funds
      */
     function executeLottery() external onlyOwner nonReentrant {
         if (isExecuted) revert LotteryAlreadyExecuted();
@@ -150,6 +170,32 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
 
         // Select random winners (decentralized, on-chain)
         _selectWinners(winnersCount);
+
+        // Calculate total prize amount needed
+        uint256 totalPrizeAmount = winnersCount * currentTier.prizePerWinner;
+        
+        // Verify sufficient funds
+        if (address(this).balance < totalPrizeAmount) revert InsufficientFunds();
+
+        // Distribute prizes to winners
+        for (uint256 i = 0; i < winners.length; i++) {
+            address winner = winners[i];
+            uint256 prize = currentTier.prizePerWinner;
+            
+            // Transfer prize to winner
+            (bool success, ) = payable(winner).call{value: prize}("");
+            if (!success) revert TransferFailed();
+            
+            emit PrizeDistributed(winner, prize);
+        }
+
+        // Return remaining funds to depositor
+        uint256 remainingFunds = address(this).balance;
+        if (remainingFunds > 0 && depositor != address(0)) {
+            (bool success, ) = payable(depositor).call{value: remainingFunds}("");
+            if (!success) revert TransferFailed();
+            emit RemainingFundsReturned(depositor, remainingFunds);
+        }
 
         // Emit event with winners and prize info
         emit LotteryExecuted(winners, currentTier.prizePerWinner, block.timestamp);
@@ -267,13 +313,6 @@ contract SocialQuestLottery is Ownable, ReentrancyGuard {
             return 0;
         }
         return deadline - block.timestamp;
-    }
-
-    /**
-     * @dev Deposit funds for prizes (via receive function)
-     */
-    receive() external payable {
-        emit FundsDeposited(msg.sender, msg.value);
     }
 
     /**
