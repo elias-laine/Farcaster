@@ -76,30 +76,40 @@ export default function Admin() {
     try {
       setIsExecuting(true);
       
+      if (!APP_CONFIG.contractAddress) {
+        throw new Error("Contract address not configured");
+      }
+      
+      console.log("[Admin] Executing lottery for contract:", APP_CONFIG.contractAddress);
+      
       const data = encodeFunctionData({
         abi: SOCIALQUEST_ABI,
         functionName: "executeLottery",
       });
+
+      console.log("[Admin] Encoded function data:", data);
 
       const hash = await sendTransaction({
         to: APP_CONFIG.contractAddress,
         data,
       });
 
-      if (!hash) {
-        throw new Error("Transaction failed or was rejected");
-      }
-
       setTxHash(hash);
       toast({
         title: "Lottery Executed!",
-        description: "Winners have been selected. Check the transaction for details.",
+        description: `Transaction hash: ${hash.slice(0, 10)}...`,
       });
+      
+      // Refresh data after execution
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/lottery-stats"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/participants"] });
+      }, 2000);
     } catch (error) {
-      console.error("Execute lottery error:", error);
+      console.error("[Admin] Execute lottery error:", error);
       toast({
-        title: "Execution Failed",
-        description: error instanceof Error ? error.message : "Something went wrong",
+        title: "تراکنش ناکام",
+        description: error instanceof Error ? error.message : "تراکنش رد شد",
         variant: "destructive",
       });
     } finally {

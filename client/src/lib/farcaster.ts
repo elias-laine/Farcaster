@@ -124,10 +124,14 @@ export async function sendTransaction(params: {
   to: string;
   data: string;
   value?: string;
-}): Promise<string | null> {
+}): Promise<string> {
   try {
     const from = await getConnectedAddress();
-    if (!from) return null;
+    if (!from) throw new Error("No wallet connected");
+    
+    console.log("[Transaction] Sending to:", params.to);
+    console.log("[Transaction] From:", from);
+    console.log("[Transaction] Data:", params.data);
     
     const txHash = await sdk.wallet.ethProvider.request({
       method: "eth_sendTransaction",
@@ -139,9 +143,11 @@ export async function sendTransaction(params: {
       }],
     });
     
+    console.log("[Transaction] Success, Hash:", txHash);
     return txHash as string;
   } catch (error) {
-    console.error("Failed to send transaction:", error);
-    return null;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error("[Transaction] Error:", errorMsg);
+    throw new Error(`Transaction failed: ${errorMsg}`);
   }
 }
