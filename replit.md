@@ -78,10 +78,11 @@ CONTRACT_ADDRESS=0x...
 
 ### Important - Deadline Configuration
 
-**LOTTERY_DEADLINE must be set when deploying the contract!**
-- It is read from the smart contract, NOT from environment variables
-- Set it during contract deployment: `export LOTTERY_DEADLINE=<unix-timestamp-seconds>`
-- The backend will fetch this value from the blockchain at runtime
+**LOTTERY_DEADLINE is OPTIONAL - Auto-set to 7 days from deployment!**
+- Deadline is stored in the smart contract (immutable)
+- If you provide `export LOTTERY_DEADLINE=<unix-timestamp>`, it will use that
+- If you don't provide it, deploy script automatically sets it to 7 days from now
+- The backend always reads deadline from blockchain at runtime
 - If CONTRACT_ADDRESS is not set, `/api/lottery-stats` will return an error
 
 ### Optional (will use defaults if not set)
@@ -140,11 +141,13 @@ cd contracts
 # Install dependencies
 forge install OpenZeppelin/openzeppelin-contracts
 
-# Set environment variables
+# Set environment variables (LOTTERY_DEADLINE is optional - defaults to 7 days)
 export SIGNER_ADDRESS=0x...          # Your signer wallet
-export LOTTERY_DEADLINE=1764547200   # Timestamp in seconds
 export BASE_URI=https://your-metadata-url/
 export PRIVATE_KEY=0x...             # Deployment wallet key
+
+# Optional: Set custom deadline (Unix timestamp in seconds)
+# export LOTTERY_DEADLINE=1764547200
 
 # Deploy to Base Sepolia (testnet - FREE!)
 forge script script/Deploy.s.sol:DeployScript \
@@ -248,12 +251,14 @@ npm run dev
 
 ## Recent Changes (Latest Session)
 
-- ✅ **Deadline From Contract** - LOTTERY_DEADLINE now MUST be read from smart contract, not env var
-- ✅ **Backend Enforcement** - `/api/lottery-stats` requires CONTRACT_ADDRESS and reads deadline from blockchain
+- ✅ **Deadline From Contract** - Deadline is stored in smart contract (immutable)
+- ✅ **Backend Reads From Blockchain** - `/api/lottery-stats` reads deadline from contract
+- ✅ **Deploy Script Auto-Defaults** - LOTTERY_DEADLINE optional, defaults to 7 days from deployment
 - ✅ **Removed Local Deadline** - Deleted DEFAULT_DEADLINE from storage.ts 
 - ✅ **Error Handling** - Frontend shows error if contract not deployed yet
 - ✅ **Persian UI** - Added Farsi messages for contract deployment state
 - ✅ **No Auto-Population** - Removed auto-populate demo data from local development
+- ✅ **No Manual Entry** - User doesn't need to manually enter LOTTERY_DEADLINE
 
 ## Previous Features
 
