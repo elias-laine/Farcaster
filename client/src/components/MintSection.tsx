@@ -85,6 +85,8 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
         const result = await response.json();
         if (result.result && result.result !== "0x0") {
           setHasMinted(true);
+        } else {
+          setHasMinted(false);
         }
       } catch (error) {
         console.warn("Failed to check on-chain mint status:", error);
@@ -94,7 +96,7 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
     };
 
     checkOnChainMint();
-  }, [walletAddress]);
+  }, [walletAddress, APP_CONFIG.contractAddress]);
 
   const handleMint = async () => {
     if (!walletAddress) {
