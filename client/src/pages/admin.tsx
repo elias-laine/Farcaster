@@ -183,10 +183,10 @@ export default function Admin() {
                     <Skeleton className="h-8 w-24" />
                   ) : (
                     <Badge 
-                      variant={(lotteryStats?.winners && lotteryStats.winners.length > 0) ? "default" : (isDeadlinePassed ? "destructive" : "secondary")}
+                      variant={lotteryStats?.isExecuted ? "default" : (isDeadlinePassed ? "destructive" : "secondary")}
                       data-testid="badge-admin-status"
                     >
-                      {(lotteryStats?.winners && lotteryStats.winners.length > 0) ? "Executed" : (isDeadlinePassed ? "Ready to Execute" : "Active")}
+                      {lotteryStats?.isExecuted ? "Executed" : (isDeadlinePassed ? "Ready to Execute" : "Active")}
                     </Badge>
                   )}
                 </div>
@@ -196,7 +196,7 @@ export default function Admin() {
         </section>
 
         {/* Execute Lottery Section - Only show if lottery hasn't been executed yet */}
-        {!txHash && !(lotteryStats?.winners && lotteryStats.winners.length > 0) && (
+        {!txHash && !lotteryStats?.isExecuted && (
           <Card className="border" data-testid="card-execute-lottery">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -262,7 +262,7 @@ export default function Admin() {
         )}
 
         {/* Winners Section (if lottery executed) */}
-        {lotteryStats?.winners && lotteryStats.winners.length > 0 && (
+        {lotteryStats?.isExecuted && lotteryStats?.winners && lotteryStats.winners.length > 0 && (
           <Card className="border border-success/20 bg-success/5" data-testid="card-winners">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-success">

@@ -92,6 +92,7 @@ export const lotteryStatsSchema = z.object({
   currentTier: lotteryTierSchema,
   deadline: z.number(),
   isActive: z.boolean(),
+  isExecuted: z.boolean().optional(),
   winners: z.array(z.string()).optional(),
 });
 

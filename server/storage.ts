@@ -129,12 +129,14 @@ export class MemStorage implements IStorage {
   async getLotteryStats(): Promise<LotteryStats> {
     const totalParticipants = this.participants.size;
     const currentTier = getCurrentTier(totalParticipants);
+    const isExecuted = this.winners.length > 0;
     
     return {
       totalParticipants,
       currentTier,
       deadline: this.deadline,
       isActive: Date.now() / 1000 < this.deadline,
+      isExecuted,
       winners: this.winners.length > 0 ? this.winners : undefined,
     };
   }

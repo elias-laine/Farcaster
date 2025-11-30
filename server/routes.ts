@@ -412,6 +412,64 @@ export async function registerRoutes(
   });
 
   // ============================================
+  // DEBUG: Check contract state directly
+  // ============================================
+  app.get("/api/debug/contract-state", async (req, res) => {
+    try {
+      if (!CONFIG.CONTRACT_ADDRESS) {
+        return res.status(400).json({
+          error: "Contract address not configured",
+        });
+      }
+
+      const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
+      const contract = new ethers.Contract(
+        CONFIG.CONTRACT_ADDRESS,
+        SOCIALQUEST_CONTRACT_ABI,
+        provider
+      );
+
+      const [
+        totalParticipants,
+        currentWinnersCount,
+        currentPrizePerWinner,
+        currentTotalPrize,
+        lotteryDeadline,
+        active,
+        executed,
+      ] = await contract.getLotteryStats();
+
+      let winners: string[] = [];
+      try {
+        winners = await contract.getWinners();
+      } catch (e) {
+        console.warn("Could not fetch winners:", e);
+      }
+
+      return res.json({
+        contractAddress: CONFIG.CONTRACT_ADDRESS,
+        rpcUrl: CONFIG.RPC_URL,
+        totalParticipants: Number(totalParticipants),
+        currentWinnersCount: Number(currentWinnersCount),
+        currentPrizePerWinner: ethers.formatEther(currentPrizePerWinner),
+        lotteryDeadline: Number(lotteryDeadline),
+        deadlineDate: new Date(Number(lotteryDeadline) * 1000).toISOString(),
+        isActive: active,
+        isExecuted: executed,
+        winnersCount: winners.length,
+        winners: winners,
+        blockchainStatus: executed ? "EXECUTED" : (active ? "ACTIVE" : "INACTIVE"),
+      });
+    } catch (error) {
+      console.error("[Debug] Contract state error:", error);
+      return res.status(500).json({
+        error: "Failed to fetch contract state",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // ============================================
   // ADMIN: GET PARTICIPANTS (from Smart Contract or fallback to storage)
   // ============================================
   app.get("/api/admin/participants", async (req, res) => {
@@ -549,6 +607,7 @@ async function getLotteryStatsFromBlockchain() {
       currentTier,
       deadline: Number(lotteryDeadline),
       isActive: active,
+      isExecuted: executed,
       winners: winners && winners.length > 0 ? winners : undefined,
     };
 
