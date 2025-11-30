@@ -40,6 +40,9 @@ export const APP_CONFIG = {
   
   // Block explorer URL
   explorerUrl: "https://basescan.org",
+
+  // RPC URL for blockchain calls
+  rpcUrl: "https://mainnet.base.org",
   
   // ============================================
   // LOTTERY CONFIGURATION

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { sendTransaction } from "@/lib/farcaster";
 import { encodeFunctionData } from "viem";
 import { useToast } from "@/hooks/use-toast";
 
-// SBT Contract ABI (mint function)
+// SBT Contract ABI
 const SBT_ABI = [
   {
     name: "mint",
@@ -20,6 +20,13 @@ const SBT_ABI = [
     ],
     outputs: [],
     stateMutability: "nonpayable",
+  },
+  {
+    name: "balanceOf",
+    type: "function",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
   },
 ] as const;
 
@@ -35,15 +42,59 @@ interface MintSectionExtendedProps extends MintSectionProps {
   fid?: number;
 }
 
-export function MintSection({ isEligible, hasMinted, onMintSuccess, fid }: MintSectionExtendedProps) {
+export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSuccess, fid }: MintSectionExtendedProps) {
   const { walletAddress, connectWallet, user } = useFarcaster();
   const { toast } = useToast();
   const [status, setStatus] = useState<MintStatus>("idle");
   const [txHash, setTxHash] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasMinted, setHasMinted] = useState<boolean>(hasMintedProp);
+  const [checkingOnChain, setCheckingOnChain] = useState<boolean>(false);
 
   // Use provided fid or get from user context
   const userFid = fid || user?.fid;
+
+  // Check on-chain if wallet has already minted
+  useEffect(() => {
+    const checkOnChainMint = async () => {
+      if (!walletAddress || !APP_CONFIG.sbtContractAddress) {
+        return;
+      }
+
+      try {
+        setCheckingOnChain(true);
+        // Use ethers to call balanceOf on the contract
+        const response = await fetch(APP_CONFIG.rpcUrl || "https://mainnet.base.org", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            method: "eth_call",
+            params: [
+              {
+                to: APP_CONFIG.sbtContractAddress,
+                // balanceOf(address) selector + address
+                data: `0x70a08231000000000000000000000000${walletAddress.slice(2).padStart(40, "0")}`,
+              },
+              "latest",
+            ],
+            id: 1,
+          }),
+        });
+
+        const result = await response.json();
+        if (result.result && result.result !== "0x0") {
+          setHasMinted(true);
+        }
+      } catch (error) {
+        console.warn("Failed to check on-chain mint status:", error);
+      } finally {
+        setCheckingOnChain(false);
+      }
+    };
+
+    checkOnChainMint();
+  }, [walletAddress]);
 
   const handleMint = async () => {
     if (!walletAddress) {
