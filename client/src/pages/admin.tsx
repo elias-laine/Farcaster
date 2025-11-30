@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { LotteryStats } from "@shared/schema";
 
 // Lottery Contract ABI (admin functions)
-const LOTTERY_ABI = [
+const SOCIALQUEST_ABI = [
   {
     name: "executeLottery",
     type: "function",
@@ -26,6 +26,13 @@ const LOTTERY_ABI = [
   },
   {
     name: "getParticipants",
+    type: "function",
+    inputs: [],
+    outputs: [{ name: "", type: "address[]" }],
+    stateMutability: "view",
+  },
+  {
+    name: "getWinners",
     type: "function",
     inputs: [],
     outputs: [{ name: "", type: "address[]" }],
@@ -66,12 +73,12 @@ export default function Admin() {
       setIsExecuting(true);
       
       const data = encodeFunctionData({
-        abi: LOTTERY_ABI,
+        abi: SOCIALQUEST_ABI,
         functionName: "executeLottery",
       });
 
       const hash = await sendTransaction({
-        to: APP_CONFIG.lotteryContractAddress,
+        to: APP_CONFIG.contractAddress,
         data,
       });
 

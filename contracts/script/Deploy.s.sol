@@ -2,8 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
-import "../src/SocialQuestSBT.sol";
-import "../src/SocialQuestLottery.sol";
+import "../src/SocialQuest.sol";
 
 contract DeployScript is Script {
     function run() external {
@@ -16,24 +15,19 @@ contract DeployScript is Script {
         
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy Lottery contract first (SBT address will be set after SBT deployment)
-        SocialQuestLottery lottery = new SocialQuestLottery(deadline, address(0));
-        console.log("Lottery deployed at:", address(lottery));
-
-        // Deploy SBT contract with lottery address
-        SocialQuestSBT sbt = new SocialQuestSBT(
+        // Deploy combined SocialQuest contract
+        SocialQuest socialQuest = new SocialQuest(
             signer,
-            address(lottery),
+            deadline,
             "Social Quest SBT",
             "SQSBT",
             baseURI
         );
-        console.log("SBT deployed at:", address(sbt));
+        console.log("SocialQuest deployed at:", address(socialQuest));
 
-        console.log("Contracts deployed successfully!");
-        console.log("Save these addresses:");
-        console.log("SBT_CONTRACT_ADDRESS:", address(sbt));
-        console.log("LOTTERY_CONTRACT_ADDRESS:", address(lottery));
+        console.log("Contract deployed successfully!");
+        console.log("Save this address:");
+        console.log("CONTRACT_ADDRESS:", address(socialQuest));
 
         vm.stopBroadcast();
     }

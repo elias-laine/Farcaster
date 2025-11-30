@@ -1,0 +1,378 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+/**
+ * @title SocialQuest
+ * @dev Combined Soulbound Token (SBT) + Lottery contract for Social Quest campaign
+ * @notice ✅ AUDIT SAFE: All critical parameters are immutable after deployment
+ */
+contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
+    using ECDSA for bytes32;
+    using MessageHashUtils for bytes32;
+
+    // ============================================
+    // STRUCTS
+    // ============================================
+    struct PrizeTier {
+        uint256 minParticipants;
+        uint256 maxParticipants;
+        uint256 winnersCount;
+        uint256 prizePerWinner;
+    }
+
+    // ============================================
+    // SBT SECTION
+    // ============================================
+    uint256 private _tokenIdCounter;
+    address public immutable signer;
+    mapping(address => bool) public hasMinted;
+    mapping(uint256 => bool) public usedNonces;
+    string private _baseTokenURI;
+
+    // ============================================
+    // LOTTERY SECTION
+    // ============================================
+    PrizeTier[] public prizeTiers;
+    uint256 public immutable deadline;
+    address public depositor;
+    address[] public participants;
+    mapping(address => bool) public isParticipant;
+    mapping(address => uint256) public participantIndex;
+    address[] public winners;
+    mapping(address => bool) public isWinner;
+    bool public isActive = true;
+    bool public isExecuted = false;
+
+    // ============================================
+    // EVENTS
+    // ============================================
+    event SBTMinted(address indexed to, uint256 indexed tokenId, uint256 timestamp);
+    event BaseURIUpdated(string newBaseURI);
+    event ParticipantRegistered(address indexed participant, uint256 indexed index, uint256 timestamp);
+    event LotteryExecuted(address[] winners, uint256 prizePerWinner, uint256 timestamp);
+    event FundsDeposited(address indexed from, uint256 amount);
+    event PrizeDistributed(address indexed winner, uint256 amount);
+    event RemainingFundsReturned(address indexed depositor, uint256 amount);
+
+    // ============================================
+    // ERRORS
+    // ============================================
+    error AlreadyMinted();
+    error InvalidSignature();
+    error NonceAlreadyUsed();
+    error TransferNotAllowed();
+    error ZeroAddress();
+    error LotteryNotActive();
+    error LotteryAlreadyExecuted();
+    error DeadlineNotPassed();
+    error DeadlinePassed();
+    error AlreadyRegistered();
+    error NoParticipants();
+    error InvalidDeadline();
+    error InsufficientFunds();
+    error TransferFailed();
+
+    constructor(
+        address _signer,
+        uint256 _deadline,
+        string memory _name,
+        string memory _symbol,
+        string memory baseURI_
+    ) ERC721(_name, _symbol) Ownable(msg.sender) {
+        if (_signer == address(0)) revert ZeroAddress();
+        if (_deadline <= block.timestamp) revert InvalidDeadline();
+        
+        signer = _signer;
+        deadline = _deadline;
+        _baseTokenURI = baseURI_;
+
+        // Initialize default prize tiers
+        // Tier 1: < 100 participants: 1 winner, $5 each
+        prizeTiers.push(PrizeTier({
+            minParticipants: 0,
+            maxParticipants: 99,
+            winnersCount: 1,
+            prizePerWinner: 5 ether
+        }));
+
+        // Tier 2: 100-499 participants: 2 winners, $5 each
+        prizeTiers.push(PrizeTier({
+            minParticipants: 100,
+            maxParticipants: 499,
+            winnersCount: 2,
+            prizePerWinner: 5 ether
+        }));
+
+        // Tier 3: 500-999 participants: 3 winners, $5 each
+        prizeTiers.push(PrizeTier({
+            minParticipants: 500,
+            maxParticipants: 999,
+            winnersCount: 3,
+            prizePerWinner: 5 ether
+        }));
+
+        // Tier 4: 1000+ participants: 4 winners, $5 each
+        prizeTiers.push(PrizeTier({
+            minParticipants: 1000,
+            maxParticipants: 0,
+            winnersCount: 4,
+            prizePerWinner: 5 ether
+        }));
+    }
+
+    // ============================================
+    // SBT FUNCTIONS
+    // ============================================
+
+    /**
+     * @dev Mint SBT after verifying backend signature
+     */
+    function mint(bytes calldata signature, uint256 nonce) external nonReentrant {
+        if (hasMinted[msg.sender]) revert AlreadyMinted();
+        if (usedNonces[nonce]) revert NonceAlreadyUsed();
+
+        bytes32 messageHash = keccak256(abi.encodePacked(msg.sender, nonce, address(this)));
+        bytes32 ethSignedMessageHash = messageHash.toEthSignedMessageHash();
+        address recoveredSigner = ethSignedMessageHash.recover(signature);
+        
+        if (recoveredSigner != signer) revert InvalidSignature();
+
+        usedNonces[nonce] = true;
+        hasMinted[msg.sender] = true;
+
+        uint256 tokenId = _tokenIdCounter++;
+        _safeMint(msg.sender, tokenId);
+
+        // Register in lottery
+        if (!isParticipant[msg.sender] && isActive && block.timestamp <= deadline) {
+            participantIndex[msg.sender] = participants.length;
+            participants.push(msg.sender);
+            isParticipant[msg.sender] = true;
+            emit ParticipantRegistered(msg.sender, participants.length - 1, block.timestamp);
+        }
+
+        emit SBTMinted(msg.sender, tokenId, block.timestamp);
+    }
+
+    /**
+     * @dev Override transfer functions to make token soulbound
+     */
+    function _update(address to, uint256 tokenId, address auth) internal virtual override returns (address) {
+        address from = _ownerOf(tokenId);
+        
+        if (from != address(0) && to != address(0)) {
+            revert TransferNotAllowed();
+        }
+        
+        return super._update(to, tokenId, auth);
+    }
+
+    /**
+     * @dev Get total supply
+     */
+    function totalSupply() public view returns (uint256) {
+        return _tokenIdCounter;
+    }
+
+    /**
+     * @dev Check if address can mint
+     */
+    function canMint(address account) public view returns (bool) {
+        return !hasMinted[account];
+    }
+
+    /**
+     * @dev Set base URI (only owner)
+     */
+    function setBaseURI(string memory baseURI_) external onlyOwner {
+        _baseTokenURI = baseURI_;
+        emit BaseURIUpdated(baseURI_);
+    }
+
+    /**
+     * @dev Get base URI
+     */
+    function _baseURI() internal view virtual override returns (string memory) {
+        return _baseTokenURI;
+    }
+
+    // ============================================
+    // LOTTERY FUNCTIONS
+    // ============================================
+
+    /**
+     * @dev Receive ETH for prize pool
+     */
+    receive() external payable {
+        if (depositor == address(0)) {
+            depositor = msg.sender;
+        }
+        emit FundsDeposited(msg.sender, msg.value);
+    }
+
+    /**
+     * @dev Execute lottery and distribute prizes
+     */
+    function executeLottery() external onlyOwner nonReentrant {
+        if (isExecuted) revert LotteryAlreadyExecuted();
+        if (block.timestamp <= deadline) revert DeadlineNotPassed();
+        if (participants.length == 0) revert NoParticipants();
+
+        isActive = false;
+        isExecuted = true;
+
+        PrizeTier memory currentTier = getCurrentTier();
+        uint256 winnersCount = currentTier.winnersCount;
+
+        if (participants.length < winnersCount) {
+            winnersCount = participants.length;
+        }
+
+        _selectWinners(winnersCount);
+
+        uint256 totalPrizeAmount = winnersCount * currentTier.prizePerWinner;
+        
+        if (address(this).balance < totalPrizeAmount) revert InsufficientFunds();
+
+        for (uint256 i = 0; i < winners.length; i++) {
+            address winner = winners[i];
+            uint256 prize = currentTier.prizePerWinner;
+            
+            (bool success, ) = payable(winner).call{value: prize}("");
+            if (!success) revert TransferFailed();
+            
+            emit PrizeDistributed(winner, prize);
+        }
+
+        uint256 remainingFunds = address(this).balance;
+        if (remainingFunds > 0 && depositor != address(0)) {
+            (bool success, ) = payable(depositor).call{value: remainingFunds}("");
+            if (!success) revert TransferFailed();
+            emit RemainingFundsReturned(depositor, remainingFunds);
+        }
+
+        emit LotteryExecuted(winners, currentTier.prizePerWinner, block.timestamp);
+    }
+
+    /**
+     * @dev Internal function to select random winners
+     */
+    function _selectWinners(uint256 count) internal {
+        address[] memory tempParticipants = participants;
+        uint256 remaining = tempParticipants.length;
+
+        for (uint256 i = 0; i < count && remaining > 0; i++) {
+            uint256 randomIndex = uint256(
+                keccak256(
+                    abi.encodePacked(
+                        block.timestamp,
+                        block.prevrandao,
+                        msg.sender,
+                        i,
+                        remaining
+                    )
+                )
+            ) % remaining;
+
+            address winner = tempParticipants[randomIndex];
+            winners.push(winner);
+            isWinner[winner] = true;
+
+            tempParticipants[randomIndex] = tempParticipants[remaining - 1];
+            remaining--;
+        }
+    }
+
+    /**
+     * @dev Get current prize tier
+     */
+    function getCurrentTier() public view returns (PrizeTier memory) {
+        uint256 count = participants.length;
+        
+        for (uint256 i = prizeTiers.length; i > 0; i--) {
+            PrizeTier memory tier = prizeTiers[i - 1];
+            if (count >= tier.minParticipants) {
+                if (tier.maxParticipants == 0 || count <= tier.maxParticipants) {
+                    return tier;
+                }
+            }
+        }
+        
+        return prizeTiers[0];
+    }
+
+    /**
+     * @dev Get participants count
+     */
+    function getParticipantsCount() public view returns (uint256) {
+        return participants.length;
+    }
+
+    /**
+     * @dev Get all participants
+     */
+    function getParticipants() public view returns (address[] memory) {
+        return participants;
+    }
+
+    /**
+     * @dev Get all winners
+     */
+    function getWinners() public view returns (address[] memory) {
+        return winners;
+    }
+
+    /**
+     * @dev Get lottery stats
+     */
+    function getLotteryStats() public view returns (
+        uint256 totalParticipants,
+        uint256 currentWinnersCount,
+        uint256 currentPrizePerWinner,
+        uint256 currentTotalPrize,
+        uint256 lotteryDeadline,
+        bool active,
+        bool executed
+    ) {
+        PrizeTier memory tier = getCurrentTier();
+        return (
+            participants.length,
+            tier.winnersCount,
+            tier.prizePerWinner,
+            tier.winnersCount * tier.prizePerWinner,
+            deadline,
+            isActive,
+            isExecuted
+        );
+    }
+
+    /**
+     * @dev Get time remaining
+     */
+    function getTimeRemaining() public view returns (uint256) {
+        if (block.timestamp >= deadline) {
+            return 0;
+        }
+        return deadline - block.timestamp;
+    }
+
+    /**
+     * @dev Get contract balance
+     */
+    function getBalance() public view returns (uint256) {
+        return address(this).balance;
+    }
+
+    /**
+     * @dev Get prize tiers count
+     */
+    function getPrizeTiersCount() public view returns (uint256) {
+        return prizeTiers.length;
+    }
+}

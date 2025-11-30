@@ -33,8 +33,7 @@ This app allows users to:
 │           └── farcaster.json # ⚠️ EDIT THIS: Farcaster app manifest
 ├── contracts/                 # Solidity smart contracts (Foundry)
 │   ├── src/
-│   │   ├── SocialQuestSBT.sol     # Soulbound Token contract
-│   │   └── SocialQuestLottery.sol # Lottery contract with auto prize distribution
+│   │   └── SocialQuest.sol    # Combined SBT + Lottery contract ✅ MERGED
 │   └── script/
 │       └── Deploy.s.sol       # Deployment script
 ├── server/                    # Backend Express server
@@ -69,9 +68,9 @@ CAST_HASH=0x...
 # Get from: https://warpcast.com/~/developers/farcaster-id
 TARGET_FID=123456
 
-# Contract Addresses (after deployment on Base)
-SBT_CONTRACT_ADDRESS=0x...
-LOTTERY_CONTRACT_ADDRESS=0x...
+# Combined SocialQuest Contract Address (after deployment on Base)
+# This single contract handles both SBT and Lottery
+CONTRACT_ADDRESS=0x...
 ```
 
 ### Optional (will use defaults if not set)
@@ -98,9 +97,8 @@ export const APP_CONFIG = {
   targetFid: 123456,                    // Must match TARGET_FID env var
   targetUsername: "yourhandle",         // Username for display
   
-  // Contract addresses (after deployment)
-  sbtContractAddress: "0x...",          // Must match SBT_CONTRACT_ADDRESS env var
-  lotteryContractAddress: "0x...",      // Must match LOTTERY_CONTRACT_ADDRESS env var
+  // Combined SocialQuest Contract address (after deployment)
+  contractAddress: "0x...",             // Must match CONTRACT_ADDRESS env var
   
   // Network
   chainId: 8453,  // 8453 = Base Mainnet, 84532 = Base Sepolia
@@ -162,11 +160,12 @@ cd contracts
 forge install OpenZeppelin/openzeppelin-contracts
 
 # Set environment variables for deployment
-export SIGNER_ADDRESS=0x...  # Your signer wallet
-export LOTTERY_DEADLINE=1764547200  # Timestamp in seconds
+export SIGNER_ADDRESS=0x...          # Your signer wallet
+export LOTTERY_DEADLINE=1764547200   # Timestamp in seconds
 export BASE_URI=https://your-metadata-url/
+export PRIVATE_KEY=0x...             # Your deployment wallet private key
 
-# Deploy to Base Testnet (Sepolia)
+# Deploy combined SocialQuest contract to Base Testnet (Sepolia)
 forge script script/Deploy.s.sol:DeployScript \
   --rpc-url https://sepolia.base.org \
   --broadcast
@@ -177,9 +176,8 @@ forge script script/Deploy.s.sol:DeployScript \
   --broadcast
 ```
 
-**After deployment, copy the contract addresses and set:**
-- `SBT_CONTRACT_ADDRESS`
-- `LOTTERY_CONTRACT_ADDRESS`
+**After deployment, copy the contract address and set:**
+- `CONTRACT_ADDRESS` (single merged contract)
 
 ### 4. Fund the Lottery
 
@@ -197,7 +195,7 @@ The funds will be held by the contract and automatically distributed when the lo
 Update `client/src/lib/config.ts` with:
 - Your cast hash and URL
 - Target FID and username
-- Contract addresses
+- Combined contract address (CONTRACT_ADDRESS)
 - Chain ID (8453 for Mainnet, 84532 for Sepolia)
 
 ### 6. Deploy Application
@@ -316,13 +314,15 @@ npm run dev
 
 ## Recent Changes
 
+- ✅ **MAJOR REFACTOR** - Merged SBT + Lottery into single SocialQuest.sol contract
+- ✅ **Single deployment** - Now deploys one contract instead of two (cheaper gas)
+- ✅ **Updated all references** - Frontend/backend now use `contractAddress` instead of `sbtContractAddress` + `lotteryContractAddress`
 - ✅ **Automatic prize distribution** - Prizes sent to winners automatically on `executeLottery()`
 - ✅ **Remaining funds refund** - Leftover funds returned to depositor automatically
-- ✅ **Immutable contracts** - All critical parameters now immutable for user trust
-- ✅ Fixed admin participants list - now fetches from blockchain
-- ✅ MintSection checks on-chain if wallet has already minted SBT
-- ✅ Reduced timer size (text-2xl → text-lg)
-- ✅ Improved date/time display format
+- ✅ **Immutable parameters** - All critical parameters immutable for security
+- ✅ Admin participants list fetches from blockchain
+- ✅ MintSection checks on-chain if wallet already minted
+- ✅ All environment variables consolidated to use single `CONTRACT_ADDRESS`
 
 ## User Preferences
 
@@ -356,7 +356,7 @@ npm run dev
 → Use correct RPC URL for your target network
 
 ### Participants list empty on admin page
-→ Ensure `LOTTERY_CONTRACT_ADDRESS` environment variable is set
+→ Ensure `CONTRACT_ADDRESS` environment variable is set
 → Verify users have minted SBTs on the blockchain
 
 ### Prize distribution not working

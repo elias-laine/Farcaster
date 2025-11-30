@@ -57,13 +57,13 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
   // Check on-chain if wallet has already minted
   useEffect(() => {
     const checkOnChainMint = async () => {
-      if (!walletAddress || !APP_CONFIG.sbtContractAddress) {
+      if (!walletAddress || !APP_CONFIG.contractAddress) {
         return;
       }
 
       try {
         setCheckingOnChain(true);
-        // Use ethers to call balanceOf on the contract
+        // Use JSON-RPC to call balanceOf on the contract
         const response = await fetch(APP_CONFIG.rpcUrl || "https://mainnet.base.org", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -72,7 +72,7 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
             method: "eth_call",
             params: [
               {
-                to: APP_CONFIG.sbtContractAddress,
+                to: APP_CONFIG.contractAddress,
                 // balanceOf(address) selector + address
                 data: `0x70a08231000000000000000000000000${walletAddress.slice(2).padStart(40, "0")}`,
               },
@@ -147,7 +147,7 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
 
       // Send transaction
       const hash = await sendTransaction({
-        to: APP_CONFIG.sbtContractAddress,
+        to: APP_CONFIG.contractAddress,
         data,
       });
 
