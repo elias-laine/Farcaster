@@ -78,6 +78,13 @@ const LOTTERY_CONTRACT_ABI = [
     outputs: [{ name: "", type: "address[]" }],
     stateMutability: "view",
   },
+  {
+    name: "getParticipants",
+    type: "function",
+    inputs: [],
+    outputs: [{ name: "", type: "address[]" }],
+    stateMutability: "view",
+  },
 ] as const;
 
 export async function registerRoutes(
@@ -324,10 +331,46 @@ export async function registerRoutes(
   });
 
   // ============================================
-  // ADMIN: GET PARTICIPANTS
+  // ADMIN: GET PARTICIPANTS (from Smart Contract or fallback to storage)
   // ============================================
   app.get("/api/admin/participants", async (req, res) => {
     try {
+      // Try to fetch from blockchain first if contract address is set
+      if (CONFIG.LOTTERY_CONTRACT_ADDRESS) {
+        try {
+          const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
+          const contract = new ethers.Contract(
+            CONFIG.LOTTERY_CONTRACT_ADDRESS,
+            LOTTERY_CONTRACT_ABI,
+            provider
+          );
+
+          const participantAddresses = await contract.getParticipants();
+          
+          // Get winners for isWinner flag
+          let winners: string[] = [];
+          try {
+            winners = await contract.getWinners();
+          } catch {
+            // If getWinners fails, just use empty array
+          }
+
+          const winnersSet = new Set(winners.map((w: string) => w.toLowerCase()));
+
+          // Map addresses to participant objects
+          const participants = participantAddresses.map((address: string) => ({
+            address: address.toLowerCase(),
+            mintedAt: Math.floor(Date.now() / 1000), // Fallback timestamp
+            isWinner: winnersSet.has(address.toLowerCase()),
+          }));
+
+          return res.json(participants);
+        } catch (error) {
+          console.warn("Failed to fetch participants from blockchain, falling back to local storage:", error);
+        }
+      }
+      
+      // Fallback to local storage
       const participants = await storage.getParticipants();
       return res.json(participants);
     } catch (error) {
