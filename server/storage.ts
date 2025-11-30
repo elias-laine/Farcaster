@@ -24,9 +24,11 @@ export interface IStorage {
 
 const TASK_TYPES: TaskType[] = ["like", "recast", "follow"];
 
-// Default deadline: from environment variable or 7 days from now
+// Default deadline: from environment variable or 1 hour ago (for testing) or 7 days from now (for production)
 const DEFAULT_DEADLINE = parseInt(process.env.LOTTERY_DEADLINE || "0") || 
-  Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
+  (process.env.NODE_ENV === "development" 
+    ? Math.floor(Date.now() / 1000) - 3600  // 1 hour ago for dev/testing
+    : Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
 
 export class MemStorage implements IStorage {
   private userProgress: Map<string, UserProgress>;

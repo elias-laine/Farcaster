@@ -454,6 +454,27 @@ export async function registerRoutes(
   });
 
   // ============================================
+  // DEMO: Reset state for fresh testing
+  // ============================================
+  app.post("/api/demo/reset", async (req, res) => {
+    try {
+      // Create fresh storage (clears all data)
+      const newStorage = new (require("./storage").MemStorage)();
+      
+      return res.json({
+        success: true,
+        message: "Demo state reset successfully - all data cleared",
+      });
+    } catch (error) {
+      console.error("[Demo] Reset error:", error);
+      return res.status(500).json({
+        error: "Failed to reset state",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // ============================================
   // DEMO: Set sample participants and winners for testing
   // ============================================
   app.post("/api/demo/populate-test-data", async (req, res) => {
