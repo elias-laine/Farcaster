@@ -192,6 +192,7 @@ Uses **block-based randomness** (completely FREE!):
 
 ## API Endpoints
 
+### Core Endpoints
 ```
 POST /api/verify-task
   Body: { fid: number, walletAddress: string, taskType: "like" | "recast" | "follow" }
@@ -200,13 +201,27 @@ POST /api/mint-signature
   Body: { fid: number, walletAddress: string }
 
 GET /api/lottery-stats
-  Returns blockchain or storage stats
+  Returns blockchain or storage stats with winners
 
 GET /api/admin/participants
-  Returns all participants from blockchain
+  Returns all participants from blockchain or storage
 
 POST /api/mint-confirmed
   Body: { fid: number, walletAddress: string, txHash: string }
+```
+
+### Demo/Testing Endpoints (Development Only)
+```
+POST /api/demo/populate-test-data
+  Body: { participantCount: number, winnersCount: number }
+  Creates test participants and winners for UI testing
+
+POST /api/demo/set-winners
+  Body: { winners: ['0x...', '0x...'] }
+  Manually set winners for testing
+
+GET /api/debug/contract-state
+  Returns raw contract state from blockchain
 ```
 
 ## Development
@@ -223,12 +238,12 @@ npm run dev
 
 ## Recent Changes (Latest Session)
 
-- ✅ **Auto-Update Mint Status** - UI updates instantly after mint (no page reload needed)
-- ✅ **English UI Complete** - All text translated to English
-- ✅ **Deadline Message** - Shows "Registration Closed" when deadline passes
-- ✅ **View Results Link** - "View Results" button links to admin page
-- ✅ **Responsive Fonts** - Adjusted font sizes for better readability
-- ✅ **Backend Configuration** - `/api/app-config` and `/api/check-mint-status` endpoints working
+- ✅ **Winners Display Fixed** - Winners now show on Admin page when lottery executed
+- ✅ **isExecuted Flag** - Backend properly tracks execution status
+- ✅ **Smart Fallback Logic** - Uses storage data when blockchain fails
+- ✅ **Dev Deadline** - Development mode sets deadline 1 hour ago for testing
+- ✅ **Demo Endpoints** - Test winners display with `/api/demo/populate-test-data`
+- ✅ **Status Badge** - Shows "Executed" when lottery is executed
 
 ## Previous Features
 
