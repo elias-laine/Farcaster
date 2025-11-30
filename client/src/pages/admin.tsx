@@ -115,9 +115,9 @@ export default function Admin() {
         {/* Header */}
         <section className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
+            <h1 className="text-3xl font-bold text-foreground">Lottery Results</h1>
             <p className="text-muted-foreground mt-1">
-              Manage the lottery and view participants
+              View winners and all participants from the lottery
             </p>
           </div>
           {walletAddress && (
