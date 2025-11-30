@@ -30,8 +30,8 @@ const CONFIG = {
   // Target FID to verify follow
   TARGET_FID: parseInt(process.env.TARGET_FID || "0"),
   
-  // Combined SocialQuest contract address
-  CONTRACT_ADDRESS: process.env.CONTRACT_ADDRESS || "",
+  // Combined SocialQuest contract address - reads from VITE_CONTRACT_ADDRESS
+  CONTRACT_ADDRESS: process.env.VITE_CONTRACT_ADDRESS || process.env.CONTRACT_ADDRESS || "",
   
   // RPC URL for blockchain queries (Base Mainnet or Sepolia)
   RPC_URL: process.env.RPC_URL || "https://mainnet.base.org",
