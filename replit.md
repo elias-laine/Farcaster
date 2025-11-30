@@ -221,7 +221,16 @@ npm run dev
 # App runs on http://localhost:5000
 ```
 
-## Recent Changes
+## Recent Changes (Latest Session)
+
+- ✅ **Auto-Update Mint Status** - UI updates instantly after mint (no page reload needed)
+- ✅ **English UI Complete** - All text translated to English
+- ✅ **Deadline Message** - Shows "Registration Closed" when deadline passes
+- ✅ **View Results Link** - "View Results" button links to admin page
+- ✅ **Responsive Fonts** - Adjusted font sizes for better readability
+- ✅ **Backend Configuration** - `/api/app-config` and `/api/check-mint-status` endpoints working
+
+## Previous Features
 
 - ✅ **Block-Based Randomness** - Secure and completely FREE
 - ✅ **Security Overhaul** - Reentrancy protection, safe transfers
