@@ -148,7 +148,11 @@ export default function Home() {
       const contractAddr = config?.contractAddress || APP_CONFIG.contractAddress;
       const rpcUrl = config?.rpcUrl || APP_CONFIG.rpcUrl;
       
+      console.log("[Mint Status Check] Config:", { contractAddr, rpcUrl, walletAddress });
+      
       if (!walletAddress || !contractAddr) {
+        console.log("[Mint Status Check] Missing wallet or contract address, skipping");
+        setOnChainMintStatus(null);
         return;
       }
 
@@ -172,9 +176,22 @@ export default function Home() {
         });
 
         const result = await response.json();
-        setOnChainMintStatus(result.result && result.result !== "0x0");
+        console.log("[Mint Status Check] RPC Response:", result);
+        
+        if (result.error) {
+          console.error("[Mint Status Check] RPC Error:", result.error);
+          setOnChainMintStatus(null);
+          return;
+        }
+
+        // Check if balance is non-zero
+        const hasMintedOnChain = result.result && result.result !== "0x" && result.result !== "0x0";
+        console.log("[Mint Status Check] Has minted on-chain:", hasMintedOnChain);
+        
+        setOnChainMintStatus(hasMintedOnChain);
       } catch (error) {
-        console.warn("Failed to check on-chain mint status:", error);
+        console.error("[Mint Status Check] Failed to check on-chain mint status:", error);
+        setOnChainMintStatus(null);
       }
     };
 

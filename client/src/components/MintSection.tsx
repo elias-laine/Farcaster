@@ -62,7 +62,10 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
       const contract = contractAddress || APP_CONFIG.contractAddress;
       const rpc = rpcUrl || APP_CONFIG.rpcUrl;
       
+      console.log("[MintSection] Checking on-chain mint status:", { contract, rpc, walletAddress });
+      
       if (!walletAddress || !contract) {
+        console.log("[MintSection] Missing wallet or contract, skipping check");
         return;
       }
 
@@ -88,13 +91,22 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
         });
 
         const result = await response.json();
-        if (result.result && result.result !== "0x0") {
-          setHasMinted(true);
-        } else {
+        console.log("[MintSection] RPC Response:", result);
+        
+        if (result.error) {
+          console.error("[MintSection] RPC Error:", result.error);
           setHasMinted(false);
+          return;
         }
+
+        // Check if balance is non-zero (minted)
+        const hasMintedOnChain = result.result && result.result !== "0x" && result.result !== "0x0";
+        console.log("[MintSection] Has minted on-chain:", hasMintedOnChain, "Balance:", result.result);
+        
+        setHasMinted(hasMintedOnChain);
       } catch (error) {
-        console.warn("Failed to check on-chain mint status:", error);
+        console.error("[MintSection] Failed to check on-chain mint status:", error);
+        setHasMinted(false);
       } finally {
         setCheckingOnChain(false);
       }
