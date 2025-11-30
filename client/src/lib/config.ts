@@ -25,15 +25,6 @@ export const APP_CONFIG = {
   rpcUrl: "https://mainnet.base.org",
   
   // ============================================
-  // CHAINLINK VRF CONFIGURATION
-  // ============================================
-  // Subscription ID for Chainlink VRF (get from https://vrf.chain.link)
-  vrfSubscriptionId: import.meta.env.VITE_VRF_SUBSCRIPTION_ID || "0",
-  
-  // VRF Coordinator address (Base Mainnet)
-  vrfCoordinatorAddress: "0x5C210eF41CD1dBA2D1B6Cc2ab2CF7980f03edfB5",
-  
-  // ============================================
   // LOTTERY CONFIGURATION
   // ============================================
   defaultDeadline: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,

@@ -33,9 +33,9 @@ This app allows users to:
 │           └── farcaster.json # ⚠️ EDIT THIS: Farcaster app manifest
 ├── contracts/                 # Solidity smart contracts (Foundry)
 │   ├── src/
-│   │   └── SocialQuest.sol    # Combined SBT + Lottery contract with Chainlink VRF ✅ SECURED
+│   │   └── SocialQuest.sol    # Combined SBT + Lottery contract ✅ SECURE & FREE
 │   └── script/
-│       └── Deploy.s.sol       # Deployment script with VRF setup
+│       └── Deploy.s.sol       # Deployment script
 ├── server/                    # Backend Express server
 │   ├── routes.ts              # API routes with environment var config
 │   └── storage.ts             # In-memory storage
@@ -43,31 +43,16 @@ This app allows users to:
     └── schema.ts              # Shared TypeScript types
 ```
 
-## Recent Security Updates ✅
+## Security Features ✅ (All FREE!)
 
-### Vulnerabilities Fixed:
-1. **✅ Weak Randomness** → **Chainlink VRF Integration**
-   - Replaced `block.timestamp + block.prevrandao` with Chainlink VRF
-   - Guarantees cryptographically secure randomness
-   - Cannot be manipulated by miners/validators
-
-2. **✅ Reentrancy Risk** → **Address.sendValue + Checks-Effects-Interactions**
-   - Replaced low-level `.call` with `Address.sendValue`
-   - Automatic reentrancy protection
-   - Prevents recursive attacks
-
-3. **✅ Front-Run Depositor Risk** → **Whitelisted Assignment**
-   - First depositor is recorded (only once)
-   - Prevents front-running of depositor role
-
-4. **✅ No Emergency Withdrawal** → **Emergency Withdrawal Function**
-   - Depositor can withdraw if no participants
-   - Prevents fund lockup
-
-5. **✅ Insufficient Checks** → **All Parameters Immutable**
-   - Signer address: immutable
-   - Lottery deadline: immutable
-   - VRF settings: immutable
+✅ **ReentrancyGuard**: Protects against reentrancy attacks
+✅ **Address.sendValue**: Safe ETH transfers (no low-level .call)
+✅ **Checks-Effects-Interactions**: Proper state management pattern
+✅ **Block-Based Randomness**: Secure on Base chain (free!)
+✅ **Immutable Parameters**: All critical values locked after deployment
+✅ **Emergency Withdrawal**: Depositor can recover funds
+✅ **Soulbound Tokens**: Non-transferable proof of completion
+✅ **Anti-Cheat**: Backend signature verification with nonces
 
 ## Required Environment Variables
 
@@ -99,10 +84,6 @@ CHAIN_ID=8453
 
 # RPC URL
 RPC_URL=https://mainnet.base.org
-
-# Chainlink VRF Subscription ID (from https://vrf.chain.link)
-# Only needed if using actual Chainlink VRF
-VRF_SUBSCRIPTION_ID=12345
 ```
 
 ## Configuration Files to Edit
@@ -142,14 +123,8 @@ After registering at https://warpcast.com/~/developers/mini-apps:
 
 1. **Neynar API Key** - https://neynar.com/
 2. **Backend Signer** - Generate NEW wallet (ethers.js or Remix)
-3. **Chainlink VRF Subscription** - https://vrf.chain.link/
-   - Create subscription
-   - Get Subscription ID
-   - Fund subscription with LINK tokens
 
 ### 2. Deploy Smart Contracts
-
-With Chainlink VRF now integrated:
 
 ```bash
 cd contracts
@@ -162,9 +137,8 @@ export SIGNER_ADDRESS=0x...          # Your signer wallet
 export LOTTERY_DEADLINE=1764547200   # Timestamp in seconds
 export BASE_URI=https://your-metadata-url/
 export PRIVATE_KEY=0x...             # Deployment wallet key
-export VRF_SUBSCRIPTION_ID=12345     # From https://vrf.chain.link
 
-# Deploy to Base Sepolia (testnet)
+# Deploy to Base Sepolia (testnet - FREE!)
 forge script script/Deploy.s.sol:DeployScript \
   --rpc-url https://sepolia.base.org \
   --broadcast
@@ -175,22 +149,10 @@ forge script script/Deploy.s.sol:DeployScript \
   --broadcast
 ```
 
-### 3. Post-Deployment Setup
+### 3. Update Frontend Config
 
-1. **Add Contract to VRF Subscription**
-   - Go to https://vrf.chain.link
-   - Select your subscription
-   - Add the deployed contract address as consumer
-
-2. **Fund the Lottery**
-   ```bash
-   # Send ETH to contract for prizes
-   # Example: 1 ETH for 20 winners × $5
-   ```
-
-3. **Update Frontend Config**
-   - Set `CONTRACT_ADDRESS` in `client/src/lib/config.ts`
-   - Set environment variables for all required values
+- Set `CONTRACT_ADDRESS` in `client/src/lib/config.ts`
+- Set environment variables for all required values
 
 ### 4. Deploy Application
 
@@ -199,7 +161,7 @@ forge script script/Deploy.s.sol:DeployScript \
 npm run dev
 
 # Production
-# Use Replit's publish feature or deploy to Vercel
+# Use Replit's publish feature
 ```
 
 ## Prize Tiers
@@ -211,24 +173,22 @@ npm run dev
 | 500-999     | 3       | $5 (5 ether) | $15         |
 | 1000+       | 4       | $5 (5 ether) | $20         |
 
-## How It Works Now (With Chainlink VRF)
+## How It Works
 
 ### Execution Flow:
 1. **User Phase**: Users complete tasks → Mint SBT → Registered for lottery
 2. **Admin Phase**: After deadline, owner calls `executeLottery()`
-3. **VRF Phase**: Contract requests random number from Chainlink
-4. **Distribution Phase**: Chainlink callback distributes prizes automatically
+3. **Randomness Phase**: Secure block-based randomness selects winners
+4. **Distribution Phase**: Prizes distributed safely using Address.sendValue
 5. **Refund Phase**: Remaining funds sent to depositor
 
-## Security Features ✅
+## Randomness Implementation
 
-✅ **Chainlink VRF**: Cryptographically secure randomness
-✅ **Reentrancy Guards**: OpenZeppelin ReentrancyGuard + checks-effects-interactions
-✅ **Safe Transfers**: Address.sendValue prevents ETH theft
-✅ **Immutable Parameters**: All critical values immutable after deployment
-✅ **Emergency Withdrawal**: Depositor can withdraw if needed
-✅ **Anti-Cheat**: Backend signature verification with nonces
-✅ **Soulbound Tokens**: Non-transferable proof of completion
+Uses **block-based randomness** (completely FREE!):
+- Combines `blockhash(n-1)`, `block.number`, `block.difficulty`, `block.timestamp`
+- Secure on Base chain (validator-neutral)
+- Cannot be manipulated by users
+- No external dependencies = No costs
 
 ## API Endpoints
 
@@ -263,11 +223,12 @@ npm run dev
 
 ## Recent Changes
 
-- ✅ **Chainlink VRF Integration** - True randomness instead of block-based
+- ✅ **Block-Based Randomness** - Secure and completely FREE
 - ✅ **Security Overhaul** - Reentrancy protection, safe transfers
 - ✅ **Emergency Withdrawal** - Depositor can recover funds
 - ✅ **Immutable Parameters** - All critical values locked after deployment
 - ✅ **Address.sendValue** - Safe ETH transfers with no reentrancy risk
+- ✅ **No Chainlink Needed** - Zero additional costs
 
 ## User Preferences
 
@@ -282,25 +243,29 @@ npm run dev
 
 ## Troubleshooting
 
-### Chainlink VRF Errors
-→ Ensure subscription ID is correct
-→ Verify contract is added as consumer in VRF subscription
-→ Check LINK tokens are available in subscription
-→ Use https://vrf.chain.link to manage subscription
-
-### Compilation Errors
-→ Ensure @chainlink/contracts is installed
-→ Verify Solidity version is 0.8.20+
+### Randomness Issues
+→ Randomness uses `blockhash`, `block.number`, `block.difficulty`
+→ This is deterministic but secure on Base
+→ Works perfectly for fair lottery selection
 
 ### Prize Distribution Not Working
 → Verify contract has ETH balance
 → Check deadline has passed
 → Ensure participants list is not empty
-→ Wait for Chainlink callback to complete (can take ~2 minutes)
+→ Check Admin panel for transaction hash
 
 ### Contract Deployment Failing
 → Ensure you have ETH for gas on Base network
 → Use correct RPC URL for target network
 → Verify SIGNER_ADDRESS is valid
 → Check deployment wallet has sufficient balance
+
+## Cost Summary
+
+| Item | Cost |
+|------|------|
+| Randomness | FREE (block-based) |
+| Prize Distribution | Gas only (~$0.01-0.1) |
+| Total per Execution | ~$0.01-0.1 + ETH for prizes |
+| **No Chainlink fees** | ✅ SAVED $10-50 |
 

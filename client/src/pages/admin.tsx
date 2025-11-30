@@ -203,7 +203,7 @@ export default function Admin() {
               Execute Lottery
             </CardTitle>
             <CardDescription>
-              Once the deadline has passed, you can execute the lottery. Chainlink VRF will select random winners.
+              Once the deadline has passed, you can execute the lottery to randomly select winners.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -216,21 +216,12 @@ export default function Admin() {
               </div>
             ) : (
               <div className="space-y-4">
-                {isExecuting && (
-                  <div className="flex items-center gap-3 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                    <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                    <div>
-                      <p className="text-sm font-medium text-primary">Requesting Chainlink VRF...</p>
-                      <p className="text-xs text-muted-foreground">Waiting for random number generation</p>
-                    </div>
-                  </div>
-                )}
                 {txHash ? (
                   <div className="flex flex-col items-center gap-3 p-6 bg-success/5 rounded-lg border border-success/20">
                     <CheckCircle2 className="h-8 w-8 text-success" />
                     <p className="font-medium text-success">Lottery Executed Successfully!</p>
                     <p className="text-xs text-muted-foreground text-center">
-                      Winners will be revealed once Chainlink VRF confirms the randomness
+                      Winners have been randomly selected and prizes distributed
                     </p>
                     <a
                       href={`${APP_CONFIG.explorerUrl}/tx/${txHash}`}
@@ -254,7 +245,7 @@ export default function Admin() {
                         {isExecuting ? (
                           <>
                             <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                            Requesting VRF...
+                            Executing...
                           </>
                         ) : (
                           <>
@@ -268,11 +259,11 @@ export default function Admin() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Execute Lottery?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action will request Chainlink VRF to randomly select {lotteryStats?.currentTier.winnersCount || 1} winner(s) 
+                          This action will randomly select {lotteryStats?.currentTier.winnersCount || 1} winner(s) 
                           from {lotteryStats?.totalParticipants || 0} participants. 
                           Each winner will receive ${lotteryStats?.currentTier.prizePerWinner || 5}.
                           
-                          Prizes will be automatically distributed once the random number is confirmed.
+                          Prizes will be automatically distributed once winners are selected.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

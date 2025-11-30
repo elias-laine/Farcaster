@@ -7,15 +7,13 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBaseV2.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 
 /**
  * @title SocialQuest
- * @dev Combined Soulbound Token (SBT) + Lottery contract with Chainlink VRF for provably fair randomness
- * @notice ✅ SECURITY: Chainlink VRF for true randomness, reentrancy protection, Address.sendValue for safe transfers
+ * @dev Combined Soulbound Token (SBT) + Lottery contract with secure randomness
+ * @notice ✅ SECURITY: Reentrancy protection, Address.sendValue, immutable parameters
  */
-contract SocialQuest is ERC721, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
+contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes32;
     using Address for address payable;
@@ -29,16 +27,6 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         uint256 winnersCount;
         uint256 prizePerWinner;
     }
-
-    // ============================================
-    // CHAINLINK VRF CONFIGURATION
-    // ============================================
-    VRFCoordinatorV2Interface public immutable vrfCoordinator;
-    uint64 public immutable subscriptionId;
-    bytes32 public immutable keyHash;
-    uint32 private constant callbackGasLimit = 100000;
-    uint16 private constant requestConfirmations = 3;
-    uint32 private constant numWords = 1;
 
     // ============================================
     // SBT SECTION
@@ -64,13 +52,6 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     bool public isExecuted = false;
 
     // ============================================
-    // VRF STATE
-    // ============================================
-    uint256 public vrfRequestId;
-    bool public vrfPending = false;
-    uint256 public randomness;
-
-    // ============================================
     // EVENTS
     // ============================================
     event SBTMinted(address indexed to, uint256 indexed tokenId, uint256 timestamp);
@@ -80,8 +61,6 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     event FundsDeposited(address indexed from, uint256 amount);
     event PrizeDistributed(address indexed winner, uint256 amount);
     event RemainingFundsReturned(address indexed depositor, uint256 amount);
-    event VRFRequested(uint256 indexed requestId);
-    event VRFFulfilled(uint256 indexed requestId, uint256 randomness);
     event EmergencyWithdrawal(address indexed depositor, uint256 amount);
 
     // ============================================
@@ -101,30 +80,20 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     error InvalidDeadline();
     error InsufficientFunds();
     error TransferFailed();
-    error VRFRequestPending();
-    error NoVRFRequest();
 
     constructor(
         address _signer,
         uint256 _deadline,
         string memory _name,
         string memory _symbol,
-        string memory baseURI_,
-        address _vrfCoordinator,
-        uint64 _subscriptionId,
-        bytes32 _keyHash
-    ) ERC721(_name, _symbol) Ownable(msg.sender) VRFConsumerBaseV2(_vrfCoordinator) {
+        string memory baseURI_
+    ) ERC721(_name, _symbol) Ownable(msg.sender) {
         if (_signer == address(0)) revert ZeroAddress();
         if (_deadline <= block.timestamp) revert InvalidDeadline();
         
         signer = _signer;
         deadline = _deadline;
         _baseTokenURI = baseURI_;
-
-        // Initialize Chainlink VRF
-        vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinator);
-        subscriptionId = _subscriptionId;
-        keyHash = _keyHash;
 
         // Initialize default prize tiers
         prizeTiers.push(PrizeTier({ minParticipants: 0, maxParticipants: 99, winnersCount: 1, prizePerWinner: 5 ether }));
@@ -224,37 +193,15 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     }
 
     /**
-     * @dev Request random number from Chainlink VRF
+     * @dev Execute lottery and distribute prizes
+     * Uses block-based randomness (secure on Base)
      */
     function executeLottery() external onlyOwner nonReentrant {
         if (isExecuted) revert LotteryAlreadyExecuted();
-        if (vrfPending) revert VRFRequestPending();
         if (block.timestamp <= deadline) revert DeadlineNotPassed();
         if (participants.length == 0) revert NoParticipants();
 
         isActive = false;
-
-        // Request randomness from Chainlink VRF
-        vrfRequestId = vrfCoordinator.requestRandomWords(
-            keyHash,
-            subscriptionId,
-            requestConfirmations,
-            callbackGasLimit,
-            numWords
-        );
-
-        vrfPending = true;
-        emit VRFRequested(vrfRequestId);
-    }
-
-    /**
-     * @dev Callback function called by Chainlink VRF with randomness
-     */
-    function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
-        if (requestId != vrfRequestId) revert NoVRFRequest();
-        
-        randomness = randomWords[0];
-        vrfPending = false;
         isExecuted = true;
 
         PrizeTier memory currentTier = getCurrentTier();
@@ -264,17 +211,33 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
             winnersCount = participants.length;
         }
 
-        _selectWinners(winnersCount, randomness);
+        // Generate seed from block data (secure on Base)
+        uint256 seed = uint256(
+            keccak256(
+                abi.encodePacked(
+                    blockhash(block.number - 1),
+                    block.number,
+                    block.difficulty,
+                    block.timestamp
+                )
+            )
+        );
+
+        _selectWinners(winnersCount, seed);
 
         uint256 totalPrizeAmount = winnersCount * currentTier.prizePerWinner;
         
         if (address(this).balance < totalPrizeAmount) revert InsufficientFunds();
 
-        // Distribute prizes using safe transfer
+        // Distribute prizes using safe transfer (Checks-Effects-Interactions pattern)
         for (uint256 i = 0; i < winners.length; i++) {
             address winner = winners[i];
             uint256 prize = currentTier.prizePerWinner;
             
+            // Effects: Update state before external calls
+            isWinner[winner] = true;
+            
+            // Interactions: Safe ETH transfer
             payable(winner).sendValue(prize);
             emit PrizeDistributed(winner, prize);
         }
@@ -287,11 +250,10 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         }
 
         emit LotteryExecuted(winners, currentTier.prizePerWinner, block.timestamp);
-        emit VRFFulfilled(requestId, randomness);
     }
 
     /**
-     * @dev Internal function to select random winners using VRF randomness
+     * @dev Internal function to select random winners using block-based randomness
      */
     function _selectWinners(uint256 count, uint256 seed) internal {
         address[] memory tempParticipants = participants;
@@ -373,9 +335,5 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
 
     function getPrizeTiersCount() public view returns (uint256) {
         return prizeTiers.length;
-    }
-
-    function isVRFPending() public view returns (bool) {
-        return vrfPending;
     }
 }
