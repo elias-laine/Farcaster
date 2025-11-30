@@ -217,7 +217,7 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
                 abi.encodePacked(
                     blockhash(block.number - 1),
                     block.number,
-                    block.difficulty,
+                    block.prevrandao,
                     block.timestamp
                 )
             )
