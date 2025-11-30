@@ -5,7 +5,7 @@
 // No need to edit this file - just set environment variables!
 
 const getEnvVar = (name: string, defaultValue: string = ""): string => {
-  return import.meta.env[`VITE_${name}`] || import.meta.env[name] || defaultValue;
+  return import.meta.env[`VITE_${name}`] || defaultValue;
 };
 
 const getEnvVarNumber = (name: string, defaultValue: number = 0): number => {
@@ -25,7 +25,7 @@ export const APP_CONFIG = {
   // ============================================
   // SMART CONTRACT ADDRESSES
   // ============================================
-  contractAddress: getEnvVar("CONTRACT_ADDRESS", ""),
+  contractAddress: getEnvVar("CONTRACT_ADDRESS", "0x"),
   
   // ============================================
   // NETWORK CONFIGURATION
