@@ -56,54 +56,30 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
   // Use provided fid or get from user context
   const userFid = fid || user?.fid;
 
-  // Check on-chain if wallet has already minted
+  // Check on-chain if wallet has already minted using backend API
   useEffect(() => {
     const checkOnChainMint = async () => {
-      const contract = contractAddress || APP_CONFIG.contractAddress;
-      const rpc = rpcUrl || APP_CONFIG.rpcUrl;
-      
-      console.log("[MintSection] Checking on-chain mint status:", { contract, rpc, walletAddress });
-      
-      if (!walletAddress || !contract) {
-        console.log("[MintSection] Missing wallet or contract, skipping check");
+      if (!walletAddress) {
+        console.log("[MintSection] No wallet address, skipping check");
         return;
       }
 
       try {
         setCheckingOnChain(true);
-        // Use JSON-RPC to call balanceOf on the contract
-        const response = await fetch(rpc || "https://mainnet.base.org", {
+        const response = await fetch("/api/check-mint-status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "eth_call",
-            params: [
-              {
-                to: contract,
-                // balanceOf(address) selector + address
-                data: `0x70a08231000000000000000000000000${walletAddress.slice(2).padStart(40, "0")}`,
-              },
-              "latest",
-            ],
-            id: 1,
-          }),
+          body: JSON.stringify({ walletAddress }),
         });
 
         const result = await response.json();
-        console.log("[MintSection] RPC Response:", result);
+        console.log("[MintSection] Backend response:", result);
         
-        if (result.error) {
-          console.error("[MintSection] RPC Error:", result.error);
+        if (result.success) {
+          setHasMinted(result.hasMinted);
+        } else {
           setHasMinted(false);
-          return;
         }
-
-        // Check if balance is non-zero (minted)
-        const hasMintedOnChain = result.result && result.result !== "0x" && result.result !== "0x0";
-        console.log("[MintSection] Has minted on-chain:", hasMintedOnChain, "Balance:", result.result);
-        
-        setHasMinted(hasMintedOnChain);
       } catch (error) {
         console.error("[MintSection] Failed to check on-chain mint status:", error);
         setHasMinted(false);
@@ -113,7 +89,7 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
     };
 
     checkOnChainMint();
-  }, [walletAddress, contractAddress, rpcUrl]);
+  }, [walletAddress]);
 
   const handleMint = async () => {
     if (!walletAddress) {

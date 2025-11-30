@@ -118,6 +118,62 @@ export async function registerRoutes(
   });
 
   // ============================================
+  // CHECK MINT STATUS (Backend queries contract)
+  // ============================================
+  app.post("/api/check-mint-status", async (req, res) => {
+    try {
+      const { walletAddress } = req.body;
+
+      if (!walletAddress) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Missing walletAddress" 
+        });
+      }
+
+      if (!CONFIG.CONTRACT_ADDRESS) {
+        return res.json({ 
+          hasMinted: false,
+          message: "Contract not configured" 
+        });
+      }
+
+      try {
+        const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
+        const contract = new ethers.Contract(
+          CONFIG.CONTRACT_ADDRESS,
+          SOCIALQUEST_CONTRACT_ABI,
+          provider
+        );
+
+        const balance = await contract.balanceOf(walletAddress);
+        const hasMinted = balance > BigInt(0);
+
+        console.log(`[Check Mint Status] Wallet ${walletAddress} balance: ${balance.toString()}`);
+
+        return res.json({ 
+          success: true,
+          hasMinted,
+          balance: balance.toString(),
+        });
+      } catch (error) {
+        console.error("[Check Mint Status] Contract error:", error);
+        return res.json({ 
+          success: false,
+          hasMinted: false,
+          message: "Failed to check mint status" 
+        });
+      }
+    } catch (error) {
+      console.error("Error checking mint status:", error);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Internal server error" 
+      });
+    }
+  });
+
+  // ============================================
   // GET USER PROGRESS
   // ============================================
   app.get("/api/user-progress", async (req, res) => {

@@ -142,61 +142,38 @@ export default function Home() {
     fetchConfig();
   }, []);
 
-  // Check on-chain mint status (most authoritative source)
+  // Check on-chain mint status using backend API
   useEffect(() => {
     const checkOnChainMint = async () => {
-      const contractAddr = config?.contractAddress || APP_CONFIG.contractAddress;
-      const rpcUrl = config?.rpcUrl || APP_CONFIG.rpcUrl;
-      
-      console.log("[Mint Status Check] Config:", { contractAddr, rpcUrl, walletAddress });
-      
-      if (!walletAddress || !contractAddr) {
-        console.log("[Mint Status Check] Missing wallet or contract address, skipping");
+      if (!walletAddress) {
+        console.log("[Mint Status Check] No wallet address, skipping");
         setOnChainMintStatus(null);
         return;
       }
 
       try {
-        const response = await fetch(rpcUrl || "https://mainnet.base.org", {
+        const response = await fetch("/api/check-mint-status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            method: "eth_call",
-            params: [
-              {
-                to: contractAddr,
-                // balanceOf(address) selector + address
-                data: `0x70a08231000000000000000000000000${walletAddress.slice(2).padStart(40, "0")}`,
-              },
-              "latest",
-            ],
-            id: 1,
-          }),
+          body: JSON.stringify({ walletAddress }),
         });
 
         const result = await response.json();
-        console.log("[Mint Status Check] RPC Response:", result);
+        console.log("[Mint Status Check] Backend response:", result);
         
-        if (result.error) {
-          console.error("[Mint Status Check] RPC Error:", result.error);
+        if (result.success) {
+          setOnChainMintStatus(result.hasMinted);
+        } else {
           setOnChainMintStatus(null);
-          return;
         }
-
-        // Check if balance is non-zero
-        const hasMintedOnChain = result.result && result.result !== "0x" && result.result !== "0x0";
-        console.log("[Mint Status Check] Has minted on-chain:", hasMintedOnChain);
-        
-        setOnChainMintStatus(hasMintedOnChain);
       } catch (error) {
-        console.error("[Mint Status Check] Failed to check on-chain mint status:", error);
+        console.error("[Mint Status Check] Failed:", error);
         setOnChainMintStatus(null);
       }
     };
 
     checkOnChainMint();
-  }, [walletAddress, config]);
+  }, [walletAddress]);
 
   // Fetch lottery stats again after mint
   const { refetch: refetchLotteryStats } = useQuery<LotteryStatsType>({
