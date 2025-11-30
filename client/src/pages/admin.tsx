@@ -85,21 +85,6 @@ export default function Admin() {
 
       console.log("[Admin] Executing lottery for contract:", APP_CONFIG.contractAddress);
       console.log("[Admin] Wallet address:", walletAddress);
-
-      // Try to verify owner (optional - for debugging)
-      try {
-        const ownerRes = await fetch("/api/verify-owner", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ walletAddress }),
-        });
-        if (ownerRes.ok) {
-          const ownerCheck = await ownerRes.json();
-          console.log("[Admin] Owner check result:", ownerCheck);
-        }
-      } catch (e) {
-        console.warn("[Admin] Could not verify owner:", e);
-      }
       
       const data = encodeFunctionData({
         abi: SOCIALQUEST_ABI,
@@ -107,6 +92,7 @@ export default function Admin() {
       });
 
       console.log("[Admin] Encoded function data:", data);
+      console.log("[Admin] Sending transaction to contract...");
 
       const hash = await sendTransaction({
         to: APP_CONFIG.contractAddress,
