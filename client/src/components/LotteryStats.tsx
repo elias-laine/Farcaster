@@ -164,8 +164,10 @@ export function LotteryStats({ stats, isLoading }: LotteryStatsProps) {
             >
               {timeRemaining}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {new Date(stats.deadline < 100000000000 ? stats.deadline * 1000 : stats.deadline).toLocaleString()}
+            <p className="text-xs text-muted-foreground mt-1 leading-tight">
+              {new Date(stats.deadline < 100000000000 ? stats.deadline * 1000 : stats.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+              {' '}
+              {new Date(stats.deadline < 100000000000 ? stats.deadline * 1000 : stats.deadline).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
             </p>
           </CardContent>
         </Card>
