@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Trophy, Users, Clock, AlertCircle, CheckCircle2, Loader2, ExternalLink } from "lucide-react";
+import { Trophy, Users, Clock, AlertCircle, CheckCircle2, Loader2, ExternalLink, RefreshCw } from "lucide-react";
 import { useFarcaster } from "@/lib/farcaster";
 import { APP_CONFIG } from "@/lib/config";
 import { sendTransaction } from "@/lib/farcaster";
@@ -49,7 +49,9 @@ interface Participant {
 export default function Admin() {
   const { walletAddress } = useFarcaster();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isLoadingDemo, setIsLoadingDemo] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
 
   // Fetch lottery stats
@@ -67,6 +69,33 @@ export default function Admin() {
   } = useQuery<Participant[]>({
     queryKey: ["/api/admin/participants"],
   });
+
+  // Auto-load test data if no participants
+  useEffect(() => {
+    if (!isLoadingStats && lotteryStats?.totalParticipants === 0) {
+      // Auto-populate test data for development
+      const autoLoadTestData = async () => {
+        try {
+          const response = await fetch("/api/demo/populate-test-data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ participantCount: 5, winnersCount: 3 }),
+          });
+          
+          if (response.ok) {
+            // Invalidate queries to refresh data
+            queryClient.invalidateQueries({ queryKey: ["/api/lottery-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/participants"] });
+          }
+        } catch (error) {
+          console.error("Auto-load test data error:", error);
+        }
+      };
+      
+      // Auto-load once
+      autoLoadTestData();
+    }
+  }, [isLoadingStats, lotteryStats?.totalParticipants, queryClient]);
 
   const handleExecuteLottery = async () => {
     try {
@@ -120,11 +149,25 @@ export default function Admin() {
               View winners and all participants from the lottery
             </p>
           </div>
-          {walletAddress && (
-            <Badge variant="outline" className="font-mono">
-              {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {walletAddress && (
+              <Badge variant="outline" className="font-mono">
+                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+              </Badge>
+            )}
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/lottery-stats"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/admin/participants"] });
+              }}
+              data-testid="button-refresh-admin"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         </section>
 
         {/* Stats Overview */}
