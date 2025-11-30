@@ -152,6 +152,7 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
 
       setTxHash(hash);
       setStatus("success");
+      setHasMinted(true);
       
       // Notify backend of successful mint
       try {
