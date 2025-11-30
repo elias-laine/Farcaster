@@ -40,9 +40,11 @@ type MintStatus = "idle" | "fetching_signature" | "minting" | "success" | "error
 
 interface MintSectionExtendedProps extends MintSectionProps {
   fid?: number;
+  contractAddress?: string;
+  rpcUrl?: string;
 }
 
-export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSuccess, fid }: MintSectionExtendedProps) {
+export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSuccess, fid, contractAddress, rpcUrl }: MintSectionExtendedProps) {
   const { walletAddress, connectWallet, user } = useFarcaster();
   const { toast } = useToast();
   const [status, setStatus] = useState<MintStatus>("idle");
@@ -57,14 +59,17 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
   // Check on-chain if wallet has already minted
   useEffect(() => {
     const checkOnChainMint = async () => {
-      if (!walletAddress || !APP_CONFIG.contractAddress) {
+      const contract = contractAddress || APP_CONFIG.contractAddress;
+      const rpc = rpcUrl || APP_CONFIG.rpcUrl;
+      
+      if (!walletAddress || !contract) {
         return;
       }
 
       try {
         setCheckingOnChain(true);
         // Use JSON-RPC to call balanceOf on the contract
-        const response = await fetch(APP_CONFIG.rpcUrl || "https://mainnet.base.org", {
+        const response = await fetch(rpc || "https://mainnet.base.org", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -72,7 +77,7 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
             method: "eth_call",
             params: [
               {
-                to: APP_CONFIG.contractAddress,
+                to: contract,
                 // balanceOf(address) selector + address
                 data: `0x70a08231000000000000000000000000${walletAddress.slice(2).padStart(40, "0")}`,
               },
@@ -96,7 +101,7 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
     };
 
     checkOnChainMint();
-  }, [walletAddress, APP_CONFIG.contractAddress]);
+  }, [walletAddress, contractAddress, rpcUrl]);
 
   const handleMint = async () => {
     if (!walletAddress) {
@@ -149,7 +154,7 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
 
       // Send transaction
       const hash = await sendTransaction({
-        to: APP_CONFIG.contractAddress,
+        to: contractAddress || APP_CONFIG.contractAddress,
         data,
       });
 

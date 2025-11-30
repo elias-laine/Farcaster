@@ -16,11 +16,20 @@ import type { Task, TaskType, UserProgress, LotteryStats as LotteryStatsType } f
 
 const TASK_ORDER: TaskType[] = ["like", "recast", "follow"];
 
+interface AppConfig {
+  castHash: string;
+  targetFid: number;
+  contractAddress: string;
+  chainId: number;
+  rpcUrl: string;
+}
+
 export default function Home() {
   const { isReady, isInFrame, user, walletAddress, openUrl, connectWallet } = useFarcaster();
   const { toast } = useToast();
   const [verifyingTask, setVerifyingTask] = useState<TaskType | null>(null);
   const [onChainMintStatus, setOnChainMintStatus] = useState<boolean | null>(null);
+  const [config, setConfig] = useState<AppConfig | null>(null);
 
   // Fetch user progress
   const { 
@@ -106,22 +115,45 @@ export default function Home() {
   }, [walletAddress, connectWallet, toast, verifyTaskMutation]);
 
   const handleOpenAction = useCallback(async (taskType: TaskType) => {
+    const castHash = config?.castHash || APP_CONFIG.castHash;
+    const targetFid = config?.targetFid || APP_CONFIG.targetFid;
+    
     if (taskType === "like" || taskType === "recast") {
       await openUrl(APP_CONFIG.castUrl);
     } else if (taskType === "follow") {
       await openUrl(`https://warpcast.com/${APP_CONFIG.targetUsername}`);
     }
-  }, [openUrl]);
+  }, [openUrl, config]);
+
+  // Fetch config from backend
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const response = await fetch("/api/app-config");
+        if (response.ok) {
+          const data = await response.json();
+          setConfig(data);
+        }
+      } catch (error) {
+        console.warn("Failed to fetch app config from backend:", error);
+      }
+    };
+
+    fetchConfig();
+  }, []);
 
   // Check on-chain mint status (most authoritative source)
   useEffect(() => {
     const checkOnChainMint = async () => {
-      if (!walletAddress || !APP_CONFIG.contractAddress) {
+      const contractAddr = config?.contractAddress || APP_CONFIG.contractAddress;
+      const rpcUrl = config?.rpcUrl || APP_CONFIG.rpcUrl;
+      
+      if (!walletAddress || !contractAddr) {
         return;
       }
 
       try {
-        const response = await fetch(APP_CONFIG.rpcUrl || "https://mainnet.base.org", {
+        const response = await fetch(rpcUrl || "https://mainnet.base.org", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -129,7 +161,7 @@ export default function Home() {
             method: "eth_call",
             params: [
               {
-                to: APP_CONFIG.contractAddress,
+                to: contractAddr,
                 // balanceOf(address) selector + address
                 data: `0x70a08231000000000000000000000000${walletAddress.slice(2).padStart(40, "0")}`,
               },
@@ -147,7 +179,7 @@ export default function Home() {
     };
 
     checkOnChainMint();
-  }, [walletAddress, APP_CONFIG.contractAddress]);
+  }, [walletAddress, config]);
 
   // Fetch lottery stats again after mint
   const { refetch: refetchLotteryStats } = useQuery<LotteryStatsType>({
@@ -281,6 +313,8 @@ export default function Home() {
             hasMinted={hasMinted}
             onMintSuccess={handleMintSuccess}
             fid={user?.fid}
+            contractAddress={config?.contractAddress || APP_CONFIG.contractAddress}
+            rpcUrl={config?.rpcUrl || APP_CONFIG.rpcUrl}
           />
         </section>
       </main>

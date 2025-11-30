@@ -97,6 +97,27 @@ export async function registerRoutes(
 ): Promise<Server> {
   
   // ============================================
+  // GET APP CONFIG (Frontend needs this)
+  // ============================================
+  app.get("/api/app-config", async (req, res) => {
+    try {
+      return res.json({
+        castHash: CONFIG.CAST_HASH,
+        targetFid: CONFIG.TARGET_FID,
+        contractAddress: CONFIG.CONTRACT_ADDRESS,
+        chainId: CONFIG.CHAIN_ID,
+        rpcUrl: CONFIG.RPC_URL,
+      });
+    } catch (error) {
+      console.error("Error getting app config:", error);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Internal server error" 
+      });
+    }
+  });
+
+  // ============================================
   // GET USER PROGRESS
   // ============================================
   app.get("/api/user-progress", async (req, res) => {
