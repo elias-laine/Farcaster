@@ -20,6 +20,7 @@ export default function Home() {
   const { isReady, isInFrame, user, walletAddress, openUrl, connectWallet } = useFarcaster();
   const { toast } = useToast();
   const [verifyingTask, setVerifyingTask] = useState<TaskType | null>(null);
+  const [onChainMintStatus, setOnChainMintStatus] = useState<boolean | null>(null);
 
   // Fetch user progress
   const { 
@@ -112,6 +113,42 @@ export default function Home() {
     }
   }, [openUrl]);
 
+  // Check on-chain mint status (most authoritative source)
+  useEffect(() => {
+    const checkOnChainMint = async () => {
+      if (!walletAddress || !APP_CONFIG.contractAddress) {
+        return;
+      }
+
+      try {
+        const response = await fetch(APP_CONFIG.rpcUrl || "https://mainnet.base.org", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            method: "eth_call",
+            params: [
+              {
+                to: APP_CONFIG.contractAddress,
+                // balanceOf(address) selector + address
+                data: `0x70a08231000000000000000000000000${walletAddress.slice(2).padStart(40, "0")}`,
+              },
+              "latest",
+            ],
+            id: 1,
+          }),
+        });
+
+        const result = await response.json();
+        setOnChainMintStatus(result.result && result.result !== "0x0");
+      } catch (error) {
+        console.warn("Failed to check on-chain mint status:", error);
+      }
+    };
+
+    checkOnChainMint();
+  }, [walletAddress, APP_CONFIG.contractAddress]);
+
   // Fetch lottery stats again after mint
   const { refetch: refetchLotteryStats } = useQuery<LotteryStatsType>({
     queryKey: ["/api/lottery-stats-refresh"],
@@ -126,6 +163,7 @@ export default function Home() {
   const handleMintSuccess = useCallback(() => {
     refetchProgress();
     refetchLotteryStats();
+    setOnChainMintStatus(true);
   }, [refetchProgress, refetchLotteryStats]);
 
   // Get task by type from user progress
@@ -151,7 +189,8 @@ export default function Home() {
   // Count completed tasks
   const completedTasksCount = userProgress?.tasks?.filter(t => t.status === "verified").length || 0;
   const allTasksCompleted = completedTasksCount === TASK_ORDER.length;
-  const hasMinted = !!userProgress?.mintedAt;
+  // Use on-chain check as source of truth (overrides backend storage)
+  const hasMinted = onChainMintStatus !== null ? onChainMintStatus : !!userProgress?.mintedAt;
 
   // Show not in frame message
   if (isReady && !isInFrame) {
