@@ -258,20 +258,20 @@ export default function Home() {
                     <AlertCircle className="h-8 w-8 text-destructive" />
                   </div>
                 </div>
-                <h2 className="text-2xl font-bold text-foreground mb-2">مهلت شرکت به پايان رسيده است</h2>
+                <h2 className="text-2xl font-bold text-foreground mb-2">Registration Closed</h2>
                 <p className="text-muted-foreground mb-6">
-                  متأسفانه مرحله ثبت‌نام برای این قرعه‌کشی پایان یافته است.
+                  Unfortunately, the registration period for this lottery has ended.
                 </p>
                 <div className="space-y-3">
                   <a
                     href="/admin"
                     className="inline-block px-6 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity"
-                    data-testid="link-admin"
+                    data-testid="link-view-results"
                   >
-                    صفحه مدیریت
+                    View Results
                   </a>
                   <p className="text-sm text-muted-foreground mt-4">
-                    برای اطلاع از قرعه‌کشی‌های بیشتر{" "}
+                    Follow{" "}
                     <a
                       href="https://warpcast.com/book"
                       target="_blank"
@@ -279,9 +279,9 @@ export default function Home() {
                       className="text-primary hover:underline"
                       data-testid="link-follow-book"
                     >
-                      اکانت @book
+                      @book
                     </a>
-                    را فالو کنید.
+                    {" "}for more lotteries.
                   </p>
                 </div>
               </CardContent>
@@ -296,9 +296,9 @@ export default function Home() {
               <Zap className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">تسک‌ها را تکمیل کنید و جوایز ببرید</h1>
+              <h1 className="text-2xl font-bold text-foreground">Complete Tasks, Win Prizes</h1>
               <p className="text-sm text-muted-foreground mt-2 max-w-lg mx-auto">
-                سه تسک ساده اجتماعی را تکمیل کنید، SBT خود را منت کنید و برای برنده شدن جوایز تا ۵ دلار وارد قرعه‌کشی شوید!
+                Complete three simple social tasks, mint your SBT, and enter the lottery for a chance to win up to $5!
               </p>
             </div>
           </section>
@@ -306,14 +306,14 @@ export default function Home() {
 
         {/* Lottery Stats */}
         <section data-testid="section-lottery-stats">
-          <h2 className="text-xl font-semibold mb-4">وضعیت قرعه‌کشی</h2>
+          <h2 className="text-xl font-semibold mb-4">Lottery Status</h2>
           <LotteryStats stats={lotteryStats || null} isLoading={isLoadingStats} />
         </section>
 
         {/* Tasks Section */}
         {!deadlineHasPassed && (
           <section data-testid="section-tasks">
-            <h2 className="text-xl font-semibold mb-4">تسک‌ها را تکمیل کنید</h2>
+            <h2 className="text-xl font-semibold mb-4">Complete Tasks</h2>
             
             {isLoadingProgress ? (
               <div className="space-y-4">
