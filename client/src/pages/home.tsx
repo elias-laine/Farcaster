@@ -51,6 +51,7 @@ export default function Home() {
   const { 
     data: lotteryStats, 
     isLoading: isLoadingStats,
+    error: lotteryStatsError,
   } = useQuery<LotteryStatsType>({
     queryKey: ["/api/lottery-stats"],
   });

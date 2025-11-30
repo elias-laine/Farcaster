@@ -58,6 +58,7 @@ export default function Admin() {
   const { 
     data: lotteryStats, 
     isLoading: isLoadingStats,
+    error: lotteryStatsError,
   } = useQuery<LotteryStats>({
     queryKey: ["/api/lottery-stats"],
   });
@@ -115,12 +116,29 @@ export default function Admin() {
       <Header />
       
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+        {/* Error Alert - Contract Not Configured */}
+        {lotteryStatsError && (
+          <Card className="border-destructive/50 bg-destructive/5">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" data-testid="icon-error" />
+                <div>
+                  <p className="font-semibold text-destructive">قرارداد هنوز مستقر نشده</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    لطفا صبر کنید تا قرارداد هوشمند در شبکه Base استقر کند.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Header */}
         <section className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Lottery Results</h1>
+            <h1 className="text-3xl font-bold text-foreground">نتایج یراندازی</h1>
             <p className="text-muted-foreground mt-1">
-              View winners and all participants from the lottery
+              برندگان و تمام شرکت کنندگان از یراندازی را ببینید
             </p>
           </div>
           <div className="flex items-center gap-2">

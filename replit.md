@@ -76,6 +76,14 @@ TARGET_FID=123456
 CONTRACT_ADDRESS=0x...
 ```
 
+### Important - Deadline Configuration
+
+**LOTTERY_DEADLINE must be set when deploying the contract!**
+- It is read from the smart contract, NOT from environment variables
+- Set it during contract deployment: `export LOTTERY_DEADLINE=<unix-timestamp-seconds>`
+- The backend will fetch this value from the blockchain at runtime
+- If CONTRACT_ADDRESS is not set, `/api/lottery-stats` will return an error
+
 ### Optional (will use defaults if not set)
 
 ```bash
@@ -201,7 +209,9 @@ POST /api/mint-signature
   Body: { fid: number, walletAddress: string }
 
 GET /api/lottery-stats
-  Returns blockchain or storage stats with winners
+  Returns blockchain lottery stats WITH deadline from contract
+  ⚠️ Requires: CONTRACT_ADDRESS must be configured
+  ⚠️ Reads deadline from smart contract (not env var)
 
 GET /api/admin/participants
   Returns all participants from blockchain or storage
@@ -238,12 +248,12 @@ npm run dev
 
 ## Recent Changes (Latest Session)
 
-- ✅ **Winners Display Fixed** - Winners now show on Admin page when lottery executed
-- ✅ **isExecuted Flag** - Backend properly tracks execution status
-- ✅ **Smart Fallback Logic** - Uses storage data when blockchain fails
-- ✅ **Dev Deadline** - Development mode sets deadline 1 hour ago for testing
-- ✅ **Demo Endpoints** - Test winners display with `/api/demo/populate-test-data`
-- ✅ **Status Badge** - Shows "Executed" when lottery is executed
+- ✅ **Deadline From Contract** - LOTTERY_DEADLINE now MUST be read from smart contract, not env var
+- ✅ **Backend Enforcement** - `/api/lottery-stats` requires CONTRACT_ADDRESS and reads deadline from blockchain
+- ✅ **Removed Local Deadline** - Deleted DEFAULT_DEADLINE from storage.ts 
+- ✅ **Error Handling** - Frontend shows error if contract not deployed yet
+- ✅ **Persian UI** - Added Farsi messages for contract deployment state
+- ✅ **No Auto-Population** - Removed auto-populate demo data from local development
 
 ## Previous Features
 

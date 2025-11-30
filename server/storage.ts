@@ -24,16 +24,11 @@ export interface IStorage {
 
 const TASK_TYPES: TaskType[] = ["like", "recast", "follow"];
 
-// Default deadline: from environment variable or 7 days from now
-const DEFAULT_DEADLINE = parseInt(process.env.LOTTERY_DEADLINE || "0") || 
-  Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
-
 export class MemStorage implements IStorage {
   private userProgress: Map<string, UserProgress>;
   private participants: Map<string, { mintedAt: number; isWinner: boolean }>;
   private usedNonces: Set<number>;
   private winners: string[];
-  private deadline: number;
   private nonceCounter: number;
 
   constructor() {
@@ -41,7 +36,6 @@ export class MemStorage implements IStorage {
     this.participants = new Map();
     this.usedNonces = new Set();
     this.winners = [];
-    this.deadline = DEFAULT_DEADLINE;
     this.nonceCounter = 1;
   }
 
@@ -134,8 +128,8 @@ export class MemStorage implements IStorage {
     return {
       totalParticipants,
       currentTier,
-      deadline: this.deadline,
-      isActive: Date.now() / 1000 < this.deadline,
+      deadline: 0, // Deadline must come from blockchain
+      isActive: false,
       isExecuted,
       winners: this.winners.length > 0 ? this.winners : undefined,
     };

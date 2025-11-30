@@ -385,34 +385,31 @@ export async function registerRoutes(
   });
 
   // ============================================
-  // GET LOTTERY STATS (from Smart Contract or fallback to storage)
+  // GET LOTTERY STATS (from Smart Contract - deadline MUST come from contract)
   // ============================================
   app.get("/api/lottery-stats", async (req, res) => {
     try {
-      let blockchainStats: any = null;
-      
-      // Try to fetch from blockchain first if contract address is set
-      if (CONFIG.CONTRACT_ADDRESS) {
-        try {
-          blockchainStats = await getLotteryStatsFromBlockchain();
-        } catch (error) {
-          console.warn("Failed to fetch from blockchain, will use local storage:", error);
-        }
+      // Must fetch from blockchain if contract is configured
+      if (!CONFIG.CONTRACT_ADDRESS) {
+        console.warn("[Lottery Stats] No contract address configured - cannot fetch deadline from blockchain");
+        return res.status(400).json({ 
+          success: false, 
+          message: "Contract not deployed yet. Please deploy and set CONTRACT_ADDRESS." 
+        });
       }
       
-      // Get fallback storage stats
-      const storageStats = await storage.getLotteryStats();
-      
-      // Merge: If blockchain has winners or isExecuted=true, use blockchain
-      // Otherwise use storage (which might have demo/test data)
-      if (blockchainStats && (blockchainStats.winners?.length > 0 || blockchainStats.isExecuted)) {
-        console.log("[Lottery Stats] Using blockchain data (has winners)");
+      try {
+        const blockchainStats = await getLotteryStatsFromBlockchain();
+        console.log("[Lottery Stats] Using blockchain data with deadline:", new Date(blockchainStats.deadline * 1000).toISOString());
         return res.json(blockchainStats);
+      } catch (error) {
+        console.error("[Lottery Stats] Failed to fetch from blockchain:", error);
+        return res.status(500).json({ 
+          success: false, 
+          message: "Failed to fetch lottery deadline from blockchain",
+          details: error instanceof Error ? error.message : String(error)
+        });
       }
-      
-      // Fallback to storage if blockchain has no winners or failed
-      console.log("[Lottery Stats] Using storage data");
-      return res.json(storageStats);
     } catch (error) {
       console.error("Error getting lottery stats:", error);
       return res.status(500).json({ 
