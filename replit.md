@@ -19,7 +19,7 @@ This app allows users to:
 │   │   │   ├── Header.tsx     # App header with wallet connection
 │   │   │   ├── TaskCard.tsx   # Individual task display
 │   │   │   ├── ProgressIndicator.tsx  # Task progress bar
-│   │   │   ├── MintSection.tsx # SBT minting UI
+│   │   │   ├── MintSection.tsx # SBT minting UI with on-chain verification
 │   │   │   └── LotteryStats.tsx # Lottery statistics display
 │   │   ├── lib/
 │   │   │   ├── config.ts      # ⚠️ EDIT THIS: App configuration
@@ -103,6 +103,7 @@ export const APP_CONFIG = {
   
   // Network
   chainId: 8453,  // 8453 = Base Mainnet, 84532 = Base Sepolia
+  rpcUrl: "https://mainnet.base.org",   // RPC endpoint for blockchain queries
 };
 ```
 
@@ -222,6 +223,11 @@ npm run dev
 - Prevents entry after deadline
 - Transparent on-chain
 
+✅ **On-Chain Verification**:
+- MintSection checks blockchain to verify if wallet already has SBT
+- Admin page fetches participants from smart contract
+- Fallback to local storage if contract address not set
+
 ## API Endpoints
 
 ```
@@ -237,8 +243,15 @@ GET /api/lottery-stats
   Returns: { totalParticipants: number, currentTier: {...}, deadline: number, isActive: boolean }
 
 GET /api/user-progress
-  Query: ?walletAddress=0x...
+  Query: ?fid=123&walletAddress=0x...
   Returns: { fid: number, tasks: {...}, allTasksCompleted: boolean, hasMinted: boolean }
+
+GET /api/admin/participants
+  Returns: [{ address: string, mintedAt: number, isWinner: boolean }, ...]
+
+POST /api/mint-confirmed
+  Body: { fid: number, walletAddress: string, txHash: string }
+  Returns: { success: boolean, message: string }
 ```
 
 ## Development
@@ -256,14 +269,13 @@ npm run dev
 
 ## Recent Changes
 
-- ✅ Fixed fid validation in mint signature endpoint
-- ✅ Updated MintSection to send fid with wallet address
-- ✅ Proper environment variable validation with warnings
-- ✅ Anti-cheat checks in backend
-- ✅ Purple-themed UI matching Farcaster branding
-- ✅ Task verification with Neynar API integration
-- ✅ Complete lottery statistics display
-- ✅ Admin panel for lottery execution
+- ✅ Fixed admin participants list - now fetches from blockchain when LOTTERY_CONTRACT_ADDRESS is set
+- ✅ MintSection now checks on-chain if wallet has already minted SBT
+- ✅ Reduced timer size (text-2xl → text-lg) to prevent line wrapping
+- ✅ Improved date/time display format to fit in one line
+- ✅ Added balanceOf function to check on-chain mint status
+- ✅ Admin page participants endpoint removed wallet requirement
+- ✅ Post-mint UX: replaced mint button with success message and @book follow link
 
 ## User Preferences
 
@@ -272,7 +284,9 @@ npm run dev
 - Smart contracts: Foundry (Solidity)
 - Network: Base (L2)
 - Design: Material Design 3 with purple theme
-- Data: In-memory storage (can be upgraded to database)
+- Data: In-memory storage with blockchain verification fallback
+- Language: Persian (Farsi) UI requests, English implementation
+- Responsive design with proper spacing and typography
 
 ## Troubleshooting
 
@@ -288,8 +302,18 @@ npm run dev
 
 ### Mint signature failing
 → Ensure all three tasks are marked as completed
-→ Check that wallet address is provided
+→ Check that wallet address and FID are provided
 
 ### Contract deployment failing
 → Ensure you have ETH for gas on Base network
 → Use correct RPC URL for your target network
+
+### Participants list empty on admin page
+→ Ensure `LOTTERY_CONTRACT_ADDRESS` environment variable is set
+→ Verify users have minted SBTs on the blockchain
+→ If not using blockchain, users must complete mint flow on this app
+
+### MintSection not showing correct status
+→ Check that `SBT_CONTRACT_ADDRESS` is set in config
+→ Verify RPC endpoint is working (`rpcUrl` in config)
+→ On-chain check uses `balanceOf` to verify SBT ownership
