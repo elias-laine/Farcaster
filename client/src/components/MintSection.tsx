@@ -224,7 +224,7 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
               <CheckCircle2 className="h-5 w-5" />
               <span className="font-medium">SBT Minted</span>
             </div>
-            <p className="text-center text-foreground font-medium">
+            <p className="text-center text-foreground font-bold text-sm">
               You've successfully entered the lottery!
             </p>
             {txHash && (
