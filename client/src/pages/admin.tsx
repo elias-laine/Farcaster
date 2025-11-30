@@ -195,90 +195,71 @@ export default function Admin() {
           </Card>
         </section>
 
-        {/* Execute Lottery Section */}
-        <Card className="border" data-testid="card-execute-lottery">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-primary" />
-              Execute Lottery
-            </CardTitle>
-            <CardDescription>
-              Once the deadline has passed, you can execute the lottery to randomly select winners.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!isDeadlinePassed ? (
-              <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
-                <AlertCircle className="h-5 w-5 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  The lottery deadline has not passed yet. Please wait until the campaign ends.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {txHash ? (
-                  <div className="flex flex-col items-center gap-3 p-6 bg-success/5 rounded-lg border border-success/20">
-                    <CheckCircle2 className="h-8 w-8 text-success" />
-                    <p className="font-medium text-success">Lottery Executed Successfully!</p>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Winners have been randomly selected and prizes distributed
-                    </p>
-                    <a
-                      href={`${APP_CONFIG.explorerUrl}/tx/${txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        {/* Execute Lottery Section - Only show if lottery hasn't been executed yet */}
+        {!txHash && !(lotteryStats?.winners && lotteryStats.winners.length > 0) && (
+          <Card className="border" data-testid="card-execute-lottery">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-primary" />
+                Execute Lottery
+              </CardTitle>
+              <CardDescription>
+                Once the deadline has passed, you can execute the lottery to randomly select winners.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!isDeadlinePassed ? (
+                <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    The lottery deadline has not passed yet. Please wait until the campaign ends.
+                  </p>
+                </div>
+              ) : (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      size="lg" 
+                      className="w-full md:w-auto"
+                      disabled={isExecuting}
+                      data-testid="button-execute-lottery"
                     >
-                      <span className="font-mono">{txHash.slice(0, 10)}...{txHash.slice(-8)}</span>
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                ) : (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button 
-                        size="lg" 
-                        className="w-full md:w-auto"
-                        disabled={isExecuting}
-                        data-testid="button-execute-lottery"
-                      >
-                        {isExecuting ? (
-                          <>
-                            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                            Executing...
-                          </>
-                        ) : (
-                          <>
-                            <Trophy className="h-5 w-5 mr-2" />
-                            Execute Lottery
-                          </>
-                        )}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Execute Lottery?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action will randomly select {lotteryStats?.currentTier.winnersCount || 1} winner(s) 
-                          from {lotteryStats?.totalParticipants || 0} participants. 
-                          Each winner will receive ${lotteryStats?.currentTier.prizePerWinner || 5}.
-                          
-                          Prizes will be automatically distributed once winners are selected.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleExecuteLottery}>
-                          Execute
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                      {isExecuting ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                          Executing...
+                        </>
+                      ) : (
+                        <>
+                          <Trophy className="h-5 w-5 mr-2" />
+                          Execute Lottery
+                        </>
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Execute Lottery?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action will randomly select {lotteryStats?.currentTier.winnersCount || 1} winner(s) 
+                        from {lotteryStats?.totalParticipants || 0} participants. 
+                        Each winner will receive ${lotteryStats?.currentTier.prizePerWinner || 5}.
+                        
+                        Prizes will be automatically distributed once winners are selected.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleExecuteLottery}>
+                        Execute
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Winners Section (if lottery executed) */}
         {lotteryStats?.winners && lotteryStats.winners.length > 0 && (
