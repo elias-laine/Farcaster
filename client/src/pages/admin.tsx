@@ -107,8 +107,8 @@ export default function Admin() {
     } catch (error) {
       console.error("[Admin] Execute lottery error:", error);
       toast({
-        title: "تراکنش ناکام",
-        description: error instanceof Error ? error.message : "تراکنش رد شد",
+        title: "Execution Failed",
+        description: error instanceof Error ? error.message : "Transaction was rejected",
         variant: "destructive",
       });
     } finally {
