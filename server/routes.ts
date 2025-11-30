@@ -389,24 +389,102 @@ export async function registerRoutes(
   // ============================================
   app.get("/api/lottery-stats", async (req, res) => {
     try {
+      let blockchainStats: any = null;
+      
       // Try to fetch from blockchain first if contract address is set
       if (CONFIG.CONTRACT_ADDRESS) {
         try {
-          const blockchainStats = await getLotteryStatsFromBlockchain();
-          return res.json(blockchainStats);
+          blockchainStats = await getLotteryStatsFromBlockchain();
         } catch (error) {
-          console.warn("Failed to fetch from blockchain, falling back to local storage:", error);
+          console.warn("Failed to fetch from blockchain, will use local storage:", error);
         }
       }
       
-      // Fallback to local storage
-      const stats = await storage.getLotteryStats();
-      return res.json(stats);
+      // Get fallback storage stats
+      const storageStats = await storage.getLotteryStats();
+      
+      // Merge: If blockchain has winners or isExecuted=true, use blockchain
+      // Otherwise use storage (which might have demo/test data)
+      if (blockchainStats && (blockchainStats.winners?.length > 0 || blockchainStats.isExecuted)) {
+        console.log("[Lottery Stats] Using blockchain data (has winners)");
+        return res.json(blockchainStats);
+      }
+      
+      // Fallback to storage if blockchain has no winners or failed
+      console.log("[Lottery Stats] Using storage data");
+      return res.json(storageStats);
     } catch (error) {
       console.error("Error getting lottery stats:", error);
       return res.status(500).json({ 
         success: false, 
         message: "Internal server error" 
+      });
+    }
+  });
+
+  // ============================================
+  // DEMO: Set sample winners for testing
+  // ============================================
+  app.post("/api/demo/set-winners", async (req, res) => {
+    try {
+      const { winners } = req.body;
+      
+      if (!winners || !Array.isArray(winners)) {
+        return res.status(400).json({
+          error: "Invalid request. Expected: { winners: ['0x...', '0x...'] }"
+        });
+      }
+
+      // Set winners in storage
+      await storage.setWinners(winners);
+      
+      return res.json({
+        success: true,
+        message: "Demo winners set successfully",
+        winnersCount: winners.length,
+        winners: winners,
+      });
+    } catch (error) {
+      console.error("[Demo] Set winners error:", error);
+      return res.status(500).json({
+        error: "Failed to set winners",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // ============================================
+  // DEMO: Set sample participants and winners for testing
+  // ============================================
+  app.post("/api/demo/populate-test-data", async (req, res) => {
+    try {
+      const participantCount = req.body.participantCount || 10;
+      const winnersCount = req.body.winnersCount || 3;
+      
+      // Generate sample participants
+      const participants: string[] = [];
+      for (let i = 0; i < participantCount; i++) {
+        const address = `0x${Math.random().toString(16).slice(2).padStart(40, '0')}`;
+        participants.push(address);
+        await storage.addParticipant(address);
+      }
+      
+      // Select random winners
+      const winners = participants.slice(0, winnersCount);
+      await storage.setWinners(winners);
+      
+      return res.json({
+        success: true,
+        message: "Test data populated successfully",
+        participantsCount: participantCount,
+        winnersCount: winnersCount,
+        winners: winners,
+      });
+    } catch (error) {
+      console.error("[Demo] Populate test data error:", error);
+      return res.status(500).json({
+        error: "Failed to populate test data",
+        details: error instanceof Error ? error.message : String(error),
       });
     }
   });
