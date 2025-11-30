@@ -218,6 +218,9 @@ export default function Home() {
   // Use on-chain check as source of truth (overrides backend storage)
   const hasMinted = onChainMintStatus !== null ? onChainMintStatus : !!userProgress?.mintedAt;
 
+  // Check if deadline has passed
+  const deadlineHasPassed = lotteryStats && lotteryStats.deadline * 1000 < Date.now();
+
   // Show not in frame message
   if (isReady && !isInFrame) {
     return (
@@ -245,72 +248,119 @@ export default function Home() {
       <Header />
       
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+        {/* Deadline Passed Message */}
+        {deadlineHasPassed && (
+          <section className="text-center space-y-4" data-testid="section-deadline-message">
+            <Card className="border-2 border-destructive/20 bg-destructive/5">
+              <CardContent className="p-8">
+                <div className="flex justify-center mb-4">
+                  <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <AlertCircle className="h-8 w-8 text-destructive" />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-foreground mb-2">مهلت شرکت به پايان رسيده است</h2>
+                <p className="text-muted-foreground mb-6">
+                  متأسفانه مرحله ثبت‌نام برای این قرعه‌کشی پایان یافته است.
+                </p>
+                <div className="space-y-3">
+                  <a
+                    href="/admin"
+                    className="inline-block px-6 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity"
+                    data-testid="link-admin"
+                  >
+                    صفحه مدیریت
+                  </a>
+                  <p className="text-sm text-muted-foreground mt-4">
+                    برای اطلاع از قرعه‌کشی‌های بیشتر{" "}
+                    <a
+                      href="https://warpcast.com/book"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                      data-testid="link-follow-book"
+                    >
+                      اکانت @book
+                    </a>
+                    را فالو کنید.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
         {/* Hero Section */}
-        <section className="text-center space-y-4" data-testid="section-hero">
-          <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 mx-auto">
-            <Zap className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Complete Tasks, Win Prizes</h1>
-            <p className="text-sm text-muted-foreground mt-2 max-w-lg mx-auto">
-              Complete three simple social tasks, mint your SBT, and enter the lottery for a chance to win up to $5!
-            </p>
-          </div>
-        </section>
+        {!deadlineHasPassed && (
+          <section className="text-center space-y-4" data-testid="section-hero">
+            <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 mx-auto">
+              <Zap className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">تسک‌ها را تکمیل کنید و جوایز ببرید</h1>
+              <p className="text-sm text-muted-foreground mt-2 max-w-lg mx-auto">
+                سه تسک ساده اجتماعی را تکمیل کنید، SBT خود را منت کنید و برای برنده شدن جوایز تا ۵ دلار وارد قرعه‌کشی شوید!
+              </p>
+            </div>
+          </section>
+        )}
 
         {/* Lottery Stats */}
         <section data-testid="section-lottery-stats">
-          <h2 className="text-xl font-semibold mb-4">Lottery Status</h2>
+          <h2 className="text-xl font-semibold mb-4">وضعیت قرعه‌کشی</h2>
           <LotteryStats stats={lotteryStats || null} isLoading={isLoadingStats} />
         </section>
 
         {/* Tasks Section */}
-        <section data-testid="section-tasks">
-          <h2 className="text-xl font-semibold mb-4">Complete Tasks</h2>
-          
-          {isLoadingProgress ? (
-            <div className="space-y-4">
-              <Skeleton className="h-2 w-full" />
-              {TASK_ORDER.map((type) => (
-                <Skeleton key={type} className="h-24 w-full rounded-lg" />
-              ))}
-            </div>
-          ) : (
-            <>
-              <ProgressIndicator 
-                completedTasks={completedTasksCount} 
-                totalTasks={TASK_ORDER.length} 
-              />
-              
+        {!deadlineHasPassed && (
+          <section data-testid="section-tasks">
+            <h2 className="text-xl font-semibold mb-4">تسک‌ها را تکمیل کنید</h2>
+            
+            {isLoadingProgress ? (
               <div className="space-y-4">
+                <Skeleton className="h-2 w-full" />
                 {TASK_ORDER.map((type) => (
-                  <TaskCard
-                    key={type}
-                    type={type}
-                    task={getTask(type)}
-                    isLocked={isTaskLocked(type)}
-                    isVerifying={verifyingTask === type}
-                    onVerify={() => handleVerifyTask(type)}
-                    onOpenAction={() => handleOpenAction(type)}
-                    targetUsername={APP_CONFIG.targetUsername}
-                  />
+                  <Skeleton key={type} className="h-24 w-full rounded-lg" />
                 ))}
               </div>
-            </>
-          )}
-        </section>
+            ) : (
+              <>
+                <ProgressIndicator 
+                  completedTasks={completedTasksCount} 
+                  totalTasks={TASK_ORDER.length} 
+                />
+                
+                <div className="space-y-4">
+                  {TASK_ORDER.map((type) => (
+                    <TaskCard
+                      key={type}
+                      type={type}
+                      task={getTask(type)}
+                      isLocked={isTaskLocked(type)}
+                      isVerifying={verifyingTask === type}
+                      onVerify={() => handleVerifyTask(type)}
+                      onOpenAction={() => handleOpenAction(type)}
+                      targetUsername={APP_CONFIG.targetUsername}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        )}
 
         {/* Mint Section */}
-        <section data-testid="section-mint">
-          <MintSection
-            isEligible={allTasksCompleted && !hasMinted}
-            hasMinted={hasMinted}
-            onMintSuccess={handleMintSuccess}
-            fid={user?.fid}
-            contractAddress={config?.contractAddress || APP_CONFIG.contractAddress}
-            rpcUrl={config?.rpcUrl || APP_CONFIG.rpcUrl}
-          />
-        </section>
+        {!deadlineHasPassed && (
+          <section data-testid="section-mint">
+            <MintSection
+              isEligible={allTasksCompleted && !hasMinted}
+              hasMinted={hasMinted}
+              onMintSuccess={handleMintSuccess}
+              fid={user?.fid}
+              contractAddress={config?.contractAddress || APP_CONFIG.contractAddress}
+              rpcUrl={config?.rpcUrl || APP_CONFIG.rpcUrl}
+            />
+          </section>
+        )}
       </main>
 
       {/* Footer */}
