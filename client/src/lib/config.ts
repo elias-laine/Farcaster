@@ -1,28 +1,39 @@
 // ============================================
-// CONFIGURATION FILE - EDIT THESE VALUES
+// CONFIGURATION - READS FROM ENVIRONMENT VARIABLES
 // ============================================
+// All values are read from environment variables (VITE_* prefix)
+// No need to edit this file - just set environment variables!
+
+const getEnvVar = (name: string, defaultValue: string = ""): string => {
+  return import.meta.env[`VITE_${name}`] || defaultValue;
+};
+
+const getEnvVarNumber = (name: string, defaultValue: number = 0): number => {
+  const value = import.meta.env[`VITE_${name}`];
+  return value ? parseInt(value) : defaultValue;
+};
 
 export const APP_CONFIG = {
   // Cast to like and recast
-  castHash: "0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6",
-  castUrl: "https://farcaster.com/hossein2001/0x28a80f62",
+  castHash: getEnvVar("CAST_HASH", "0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6"),
+  castUrl: getEnvVar("CAST_URL", "https://farcaster.com/hossein2001/0x28a80f62"),
   
   // Account to follow
-  targetFid: 958667,
-  targetUsername: "hossein2001",
+  targetFid: getEnvVarNumber("TARGET_FID", 958667),
+  targetUsername: getEnvVar("TARGET_USERNAME", "hossein2001"),
   
   // ============================================
   // SMART CONTRACT ADDRESSES
   // ============================================
-  contractAddress: "0x72D7eC7607FF89c83c151d006BddA48101629987",
+  contractAddress: getEnvVar("CONTRACT_ADDRESS", "0x72D7eC7607FF89c83c151d006BddA48101629987"),
   
   // ============================================
   // NETWORK CONFIGURATION
   // ============================================
-  chainId: 8453,
-  chainName: "Base",
-  explorerUrl: "https://basescan.org",
-  rpcUrl: "https://mainnet.base.org",
+  chainId: getEnvVarNumber("CHAIN_ID", 8453),
+  chainName: getEnvVar("CHAIN_NAME", "Base"),
+  explorerUrl: getEnvVar("EXPLORER_URL", "https://basescan.org"),
+  rpcUrl: getEnvVar("RPC_URL", "https://mainnet.base.org"),
   
   // ============================================
   // LOTTERY CONFIGURATION
@@ -49,15 +60,15 @@ export const BASE_CHAIN = {
   },
   rpcUrls: {
     default: {
-      http: ["https://mainnet.base.org"],
+      http: [APP_CONFIG.rpcUrl],
     },
     public: {
-      http: ["https://mainnet.base.org"],
+      http: [APP_CONFIG.rpcUrl],
     },
   },
   blockExplorers: {
     default: {
-      name: "BaseScan",
+      name: APP_CONFIG.chainName,
       url: APP_CONFIG.explorerUrl,
     },
   },
