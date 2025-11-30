@@ -25,7 +25,7 @@ export const APP_CONFIG = {
   // ============================================
   // SMART CONTRACT ADDRESSES
   // ============================================
-  contractAddress: getEnvVar("CONTRACT_ADDRESS", "0x72D7eC7607FF89c83c151d006BddA48101629987"),
+  contractAddress: getEnvVar("CONTRACT_ADDRESS", ""),
   
   // ============================================
   // NETWORK CONFIGURATION
