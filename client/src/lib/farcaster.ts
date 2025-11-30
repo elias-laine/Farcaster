@@ -146,8 +146,10 @@ export async function sendTransaction(params: {
     console.log("[Transaction] Success, Hash:", txHash);
     return txHash as string;
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error("[Transaction] Error:", errorMsg);
+    const fullError = error instanceof Error ? error : new Error(String(error));
+    console.error("[Transaction] Full error object:", error);
+    console.error("[Transaction] Error message:", fullError.message);
+    const errorMsg = fullError.message || String(error);
     throw new Error(`Transaction failed: ${errorMsg}`);
   }
 }

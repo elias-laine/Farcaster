@@ -112,7 +112,9 @@ export default function Admin() {
       }, 2000);
     } catch (error) {
       console.error("[Admin] Execute lottery error:", error);
+      console.error("[Admin] Error object:", JSON.stringify(error, null, 2));
       const errorMsg = error instanceof Error ? error.message : "Transaction was rejected";
+      console.error("[Admin] Final error message for user:", errorMsg);
       toast({
         title: "Execution Failed",
         description: errorMsg,
