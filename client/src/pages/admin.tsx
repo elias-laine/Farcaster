@@ -100,6 +100,13 @@ export default function Admin() {
 
       const ownerCheck = await ownerRes.json();
       
+      console.log("[Admin] Owner check result:", ownerCheck);
+
+      if (!ownerCheck.canExecute) {
+        const errors = ownerCheck.executionErrors?.join(", ") || "Unable to execute lottery";
+        throw new Error(`Cannot execute lottery: ${errors}`);
+      }
+
       if (!ownerCheck.isOwner) {
         throw new Error(
           `Your wallet (${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}) is NOT the contract owner. ` +

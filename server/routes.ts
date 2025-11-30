@@ -416,11 +416,31 @@ export async function registerRoutes(
       const contractOwner = await contract.owner();
       const isOwner = contractOwner.toLowerCase() === walletAddress.toLowerCase();
 
+      // Also check pre-execution conditions
+      const [totalParticipants, , , , lotteryDeadline, isActive, isExecuted] = 
+        await contract.getLotteryStats();
+
+      const currentTime = Math.floor(Date.now() / 1000);
+      const deadlinePassed = currentTime > Number(lotteryDeadline);
+      const hasParticipants = Number(totalParticipants) > 0;
+
+      const executionErrors = [];
+      if (!isOwner) executionErrors.push("Not contract owner");
+      if (isExecuted) executionErrors.push("Lottery already executed");
+      if (!deadlinePassed) executionErrors.push(`Deadline not passed (${Number(lotteryDeadline) - currentTime}s remaining)`);
+      if (!hasParticipants) executionErrors.push("No participants registered");
+
       return res.json({
         walletAddress,
         contractOwner,
         isOwner,
-        message: isOwner ? "Wallet is the contract owner" : "Wallet is NOT the contract owner"
+        totalParticipants: Number(totalParticipants),
+        deadlinePassed,
+        hasParticipants,
+        isActive,
+        isExecuted,
+        executionErrors,
+        canExecute: isOwner && !isExecuted && deadlinePassed && hasParticipants
       });
     } catch (error) {
       console.error("[Verify Owner] Error:", error);
