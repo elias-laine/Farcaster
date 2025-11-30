@@ -46,10 +46,6 @@ interface Participant {
   isWinner: boolean;
 }
 
-interface AppConfig {
-  contractAddress: string;
-}
-
 export default function Admin() {
   const { walletAddress } = useFarcaster();
   const { toast } = useToast();
@@ -57,7 +53,6 @@ export default function Admin() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [isLoadingDemo, setIsLoadingDemo] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
-  const [config, setConfig] = useState<AppConfig | null>(null);
 
   // Fetch lottery stats
   const { 
@@ -76,33 +71,15 @@ export default function Admin() {
     queryKey: ["/api/admin/participants"],
   });
 
-  // Fetch config from backend
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const response = await fetch("/api/app-config");
-        if (response.ok) {
-          const data = await response.json();
-          setConfig(data);
-        }
-      } catch (error) {
-        console.warn("Failed to fetch app config from backend:", error);
-      }
-    };
-
-    fetchConfig();
-  }, []);
-
   const handleExecuteLottery = async () => {
     try {
       setIsExecuting(true);
       
-      const contractAddr = config?.contractAddress || APP_CONFIG.contractAddress;
-      if (!contractAddr) {
+      if (!APP_CONFIG.contractAddress) {
         throw new Error("Contract address not configured");
       }
       
-      console.log("[Admin] Executing lottery for contract:", contractAddr);
+      console.log("[Admin] Executing lottery for contract:", APP_CONFIG.contractAddress);
       
       const data = encodeFunctionData({
         abi: SOCIALQUEST_ABI,
@@ -112,7 +89,7 @@ export default function Admin() {
       console.log("[Admin] Encoded function data:", data);
 
       const hash = await sendTransaction({
-        to: contractAddr,
+        to: APP_CONFIG.contractAddress,
         data,
       });
 
