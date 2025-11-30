@@ -70,32 +70,6 @@ export default function Admin() {
     queryKey: ["/api/admin/participants"],
   });
 
-  // Auto-load test data if no participants
-  useEffect(() => {
-    if (!isLoadingStats && lotteryStats?.totalParticipants === 0) {
-      // Auto-populate test data for development
-      const autoLoadTestData = async () => {
-        try {
-          const response = await fetch("/api/demo/populate-test-data", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ participantCount: 5, winnersCount: 3 }),
-          });
-          
-          if (response.ok) {
-            // Invalidate queries to refresh data
-            queryClient.invalidateQueries({ queryKey: ["/api/lottery-stats"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/admin/participants"] });
-          }
-        } catch (error) {
-          console.error("Auto-load test data error:", error);
-        }
-      };
-      
-      // Auto-load once
-      autoLoadTestData();
-    }
-  }, [isLoadingStats, lotteryStats?.totalParticipants, queryClient]);
 
   const handleExecuteLottery = async () => {
     try {

@@ -62,28 +62,6 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
-  // Auto-populate demo data for development/testing
-  if (process.env.NODE_ENV === "development") {
-    try {
-      const { storage } = await import("./storage");
-      // Create sample participants for testing
-      const participants: string[] = [];
-      for (let i = 0; i < 5; i++) {
-        const address = `0x${Math.random().toString(16).slice(2).padStart(40, '0')}`;
-        participants.push(address);
-        await storage.addParticipant(address);
-      }
-      
-      // Select 3 random winners
-      const winners = participants.slice(0, 3);
-      await storage.setWinners(winners);
-      
-      log("[Development] Auto-loaded demo data: 5 participants, 3 winners");
-    } catch (error) {
-      console.error("[Development] Error loading demo data:", error);
-    }
-  }
-
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
