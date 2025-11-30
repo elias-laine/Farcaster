@@ -159,7 +159,7 @@ export function LotteryStats({ stats, isLoading }: LotteryStatsProps) {
               <span className="text-sm">Deadline</span>
             </div>
             <p 
-              className="text-2xl font-bold font-mono text-foreground"
+              className="text-lg font-bold font-mono text-foreground"
               data-testid="text-time-remaining"
             >
               {timeRemaining}
