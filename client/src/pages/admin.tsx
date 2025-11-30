@@ -183,10 +183,10 @@ export default function Admin() {
                     <Skeleton className="h-8 w-24" />
                   ) : (
                     <Badge 
-                      variant={isDeadlinePassed ? "destructive" : "secondary"}
+                      variant={(lotteryStats?.winners && lotteryStats.winners.length > 0) ? "default" : (isDeadlinePassed ? "destructive" : "secondary")}
                       data-testid="badge-admin-status"
                     >
-                      {isDeadlinePassed ? "Ready to Execute" : "Active"}
+                      {(lotteryStats?.winners && lotteryStats.winners.length > 0) ? "Executed" : (isDeadlinePassed ? "Ready to Execute" : "Active")}
                     </Badge>
                   )}
                 </div>
