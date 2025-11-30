@@ -123,9 +123,9 @@ export default function Admin() {
               <div className="flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" data-testid="icon-error" />
                 <div>
-                  <p className="font-semibold text-destructive">قرارداد هنوز مستقر نشده</p>
+                  <p className="font-semibold text-destructive">Contract Not Deployed</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    لطفا صبر کنید تا قرارداد هوشمند در شبکه Base استقر کند.
+                    Please wait for the smart contract to be deployed on Base network.
                   </p>
                 </div>
               </div>
@@ -136,9 +136,9 @@ export default function Admin() {
         {/* Header */}
         <section className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">نتایج یراندازی</h1>
+            <h1 className="text-3xl font-bold text-foreground">Lottery Results</h1>
             <p className="text-muted-foreground mt-1">
-              برندگان و تمام شرکت کنندگان از یراندازی را ببینید
+              View winners and all participants from the lottery
             </p>
           </div>
           <div className="flex items-center gap-2">
