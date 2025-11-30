@@ -59,7 +59,6 @@ export default function Admin() {
     isLoading: isLoadingParticipants,
   } = useQuery<Participant[]>({
     queryKey: ["/api/admin/participants"],
-    enabled: !!walletAddress,
   });
 
   const handleExecuteLottery = async () => {
