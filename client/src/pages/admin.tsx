@@ -78,8 +78,34 @@ export default function Admin() {
       if (!APP_CONFIG.contractAddress) {
         throw new Error("Contract address not configured");
       }
-      
+
+      if (!walletAddress) {
+        throw new Error("Wallet not connected");
+      }
+
       console.log("[Admin] Executing lottery for contract:", APP_CONFIG.contractAddress);
+      console.log("[Admin] Wallet address:", walletAddress);
+
+      // Verify wallet is the contract owner
+      const ownerRes = await fetch("/api/verify-owner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletAddress }),
+      });
+
+      if (!ownerRes.ok) {
+        const error = await ownerRes.json();
+        throw new Error(`Owner verification failed: ${error.details || error.error}`);
+      }
+
+      const ownerCheck = await ownerRes.json();
+      
+      if (!ownerCheck.isOwner) {
+        throw new Error(
+          `Your wallet (${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}) is NOT the contract owner. ` +
+          `Contract owner is: ${ownerCheck.contractOwner}`
+        );
+      }
       
       const data = encodeFunctionData({
         abi: SOCIALQUEST_ABI,
@@ -106,9 +132,10 @@ export default function Admin() {
       }, 2000);
     } catch (error) {
       console.error("[Admin] Execute lottery error:", error);
+      const errorMsg = error instanceof Error ? error.message : "Transaction was rejected";
       toast({
         title: "Execution Failed",
-        description: error instanceof Error ? error.message : "Transaction was rejected",
+        description: errorMsg,
         variant: "destructive",
       });
     } finally {

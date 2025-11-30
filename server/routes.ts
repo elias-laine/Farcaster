@@ -89,6 +89,13 @@ const SOCIALQUEST_CONTRACT_ABI = [
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
+  {
+    name: "owner",
+    type: "function",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
 ] as const;
 
 export async function registerRoutes(
@@ -380,6 +387,46 @@ export async function registerRoutes(
       return res.status(500).json({ 
         success: false, 
         message: "Internal server error" 
+      });
+    }
+  });
+
+  // ============================================
+  // VERIFY OWNER (Check if wallet is contract owner)
+  // ============================================
+  app.post("/api/verify-owner", async (req, res) => {
+    try {
+      const { walletAddress } = req.body;
+      
+      if (!walletAddress) {
+        return res.status(400).json({ error: "Missing walletAddress" });
+      }
+      
+      if (!CONFIG.CONTRACT_ADDRESS) {
+        return res.status(400).json({ error: "Contract address not configured" });
+      }
+
+      const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
+      const contract = new ethers.Contract(
+        CONFIG.CONTRACT_ADDRESS,
+        SOCIALQUEST_CONTRACT_ABI,
+        provider
+      );
+
+      const contractOwner = await contract.owner();
+      const isOwner = contractOwner.toLowerCase() === walletAddress.toLowerCase();
+
+      return res.json({
+        walletAddress,
+        contractOwner,
+        isOwner,
+        message: isOwner ? "Wallet is the contract owner" : "Wallet is NOT the contract owner"
+      });
+    } catch (error) {
+      console.error("[Verify Owner] Error:", error);
+      return res.status(500).json({
+        error: "Failed to verify owner",
+        details: error instanceof Error ? error.message : String(error)
       });
     }
   });
