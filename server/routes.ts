@@ -406,6 +406,10 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Contract address not configured" });
       }
 
+      console.log("[Verify Owner] Checking wallet:", walletAddress);
+      console.log("[Verify Owner] Contract:", CONFIG.CONTRACT_ADDRESS);
+      console.log("[Verify Owner] RPC URL:", CONFIG.RPC_URL);
+
       const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
       const contract = new ethers.Contract(
         CONFIG.CONTRACT_ADDRESS,
@@ -413,10 +417,14 @@ export async function registerRoutes(
         provider
       );
 
+      console.log("[Verify Owner] Calling contract.owner()...");
       const contractOwner = await contract.owner();
+      console.log("[Verify Owner] Got owner:", contractOwner);
+      
       const isOwner = contractOwner.toLowerCase() === walletAddress.toLowerCase();
 
       // Also check pre-execution conditions
+      console.log("[Verify Owner] Getting lottery stats...");
       const [totalParticipants, , , , lotteryDeadline, isActive, isExecuted] = 
         await contract.getLotteryStats();
 
@@ -429,6 +437,8 @@ export async function registerRoutes(
       if (isExecuted) executionErrors.push("Lottery already executed");
       if (!deadlinePassed) executionErrors.push(`Deadline not passed (${Number(lotteryDeadline) - currentTime}s remaining)`);
       if (!hasParticipants) executionErrors.push("No participants registered");
+
+      console.log("[Verify Owner] Results:", { isOwner, deadlinePassed, hasParticipants, isExecuted });
 
       return res.json({
         walletAddress,
@@ -444,9 +454,11 @@ export async function registerRoutes(
       });
     } catch (error) {
       console.error("[Verify Owner] Error:", error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("[Verify Owner] Error details:", errorMsg);
       return res.status(500).json({
         error: "Failed to verify owner",
-        details: error instanceof Error ? error.message : String(error)
+        details: errorMsg
       });
     }
   });
