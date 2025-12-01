@@ -75,8 +75,8 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     // ============================================
     // Base Mainnet ETH/USD Price Feed
     AggregatorV3Interface public constant priceFeed = 
-        AggregatorV3Interface(0x71041dDDAD3287F3D7D07F0B6f1D4E1d493B0331);
-    uint256 public constant USD_PRIZE_AMOUNT = 5 * 10**18; // $5 in wei format (5 * 10^18)
+        AggregatorV3Interface(0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70);
+    uint256 public constant USD_PRIZE_AMOUNT = 2 * 10**17; // $0.2 in wei format (0.2 * 10^18)
 
     // ============================================
     // EVENTS
