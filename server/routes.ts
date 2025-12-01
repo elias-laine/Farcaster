@@ -773,6 +773,44 @@ export async function registerRoutes(
 // BLOCKCHAIN FUNCTIONS - Read Lottery Stats from Smart Contract
 // ============================================
 
+// Chainlink price feed ABI for reading ETH/USD price
+const CHAINLINK_FEED_ABI = [
+  {
+    name: "latestRoundData",
+    type: "function",
+    inputs: [],
+    outputs: [
+      { name: "roundId", type: "uint80" },
+      { name: "answer", type: "int256" },
+      { name: "startedAt", type: "uint256" },
+      { name: "updatedAt", type: "uint256" },
+      { name: "answeredInRound", type: "uint80" },
+    ],
+    stateMutability: "view",
+  },
+] as const;
+
+// Get ETH/USD price from Chainlink and convert wei to USD
+async function weiToUsd(weiAmount: bigint): Promise<number> {
+  try {
+    const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
+    const priceFeedAddress = "0x71041dDDAD3287F3D7D07F0B6f1D4E1d493B0331"; // Base Mainnet ETH/USD
+    const priceFeed = new ethers.Contract(priceFeedAddress, CHAINLINK_FEED_ABI, provider);
+    
+    const [, answer] = await priceFeed.latestRoundData();
+    // answer is in 8 decimals (e.g., 2500 * 10^8 for $2500)
+    const ethPriceInUsd = Number(answer) / 10**8;
+    
+    // Convert wei to ETH then to USD
+    const ethAmount = parseFloat(ethers.formatEther(weiAmount));
+    return ethAmount * ethPriceInUsd;
+  } catch (error) {
+    console.warn("[weiToUsd] Error converting wei to USD:", error);
+    // Fallback: assume $5 USD = 0.002 ETH (at $2500/ETH)
+    return parseFloat(ethers.formatEther(weiAmount)) * 2500;
+  }
+}
+
 async function getLotteryStatsFromBlockchain() {
   if (!CONFIG.CONTRACT_ADDRESS) {
     throw new Error("Contract address not configured");
@@ -810,12 +848,16 @@ async function getLotteryStatsFromBlockchain() {
       console.warn("[Blockchain] Could not fetch winners:", e);
     }
 
+    // Convert wei amounts to USD
+    const prizePerWinnerUsd = await weiToUsd(currentPrizePerWinner);
+    const totalPrizeUsd = await weiToUsd(currentTotalPrize);
+
     const currentTier = {
       minParticipants: 0,
       maxParticipants: undefined,
       winnersCount: Number(currentWinnersCount),
-      prizePerWinner: parseFloat(ethers.formatEther(currentPrizePerWinner)),
-      totalPrize: parseFloat(ethers.formatEther(currentTotalPrize)),
+      prizePerWinner: Math.round(prizePerWinnerUsd * 100) / 100, // Round to 2 decimals
+      totalPrize: Math.round(totalPrizeUsd * 100) / 100, // Round to 2 decimals
     };
 
     const stats = {
@@ -829,6 +871,8 @@ async function getLotteryStatsFromBlockchain() {
 
     console.log("[Blockchain] Stats retrieved successfully:", {
       participants: stats.totalParticipants,
+      prizePerWinner: `$${currentTier.prizePerWinner} USD`,
+      totalPrize: `$${currentTier.totalPrize} USD`,
       deadline: new Date(stats.deadline * 1000).toISOString(),
       winners: winners?.length || 0,
     });
