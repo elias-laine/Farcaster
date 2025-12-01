@@ -53,28 +53,6 @@ export default function Admin() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [isLoadingDemo, setIsLoadingDemo] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
-  const [contractOwner, setContractOwner] = useState<string | null>(null);
-  const [loadingOwner, setLoadingOwner] = useState(false);
-
-  // Fetch contract owner on mount
-  useEffect(() => {
-    const fetchOwner = async () => {
-      try {
-        setLoadingOwner(true);
-        const res = await fetch("/api/debug/owner");
-        if (res.ok) {
-          const data = await res.json();
-          setContractOwner(data.owner);
-          console.log("[Admin] Contract owner:", data.owner);
-        }
-      } catch (e) {
-        console.warn("[Admin] Could not fetch owner:", e);
-      } finally {
-        setLoadingOwner(false);
-      }
-    };
-    fetchOwner();
-  }, []);
 
   // Fetch lottery stats
   const { 
@@ -171,46 +149,6 @@ export default function Admin() {
               </div>
             </CardContent>
           </Card>
-        )}
-
-        {/* Owner/Wallet Info */}
-        {(walletAddress || contractOwner) && (
-          <section className="bg-muted/50 border rounded-lg p-4 space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Your Wallet</p>
-                <p className="font-mono text-sm break-all">
-                  {walletAddress ? `${walletAddress.slice(0, 10)}...${walletAddress.slice(-8)}` : "Not connected"}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Contract Owner</p>
-                {loadingOwner ? (
-                  <Skeleton className="h-5 w-40" />
-                ) : contractOwner ? (
-                  <p className="font-mono text-sm break-all">
-                    {contractOwner.slice(0, 10)}...{contractOwner.slice(-8)}
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Unknown</p>
-                )}
-              </div>
-            </div>
-            {walletAddress && contractOwner && walletAddress.toLowerCase() !== contractOwner.toLowerCase() && (
-              <div className="bg-destructive/10 border border-destructive/20 rounded p-3">
-                <p className="text-sm text-destructive font-medium">
-                  ⚠️ Your wallet is NOT the contract owner. Only the owner can execute the lottery.
-                </p>
-              </div>
-            )}
-            {walletAddress && contractOwner && walletAddress.toLowerCase() === contractOwner.toLowerCase() && (
-              <div className="bg-success/10 border border-success/20 rounded p-3">
-                <p className="text-sm text-success font-medium">
-                  ✓ Your wallet IS the contract owner. You can execute the lottery.
-                </p>
-              </div>
-            )}
-          </section>
         )}
 
         {/* Header */}
