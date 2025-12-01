@@ -90,6 +90,7 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     event RemainingFundsReturned(address indexed depositor, uint256 amount);
     event EmergencyWithdrawal(address indexed depositor, uint256 amount);
     event PriceUpdated(int256 latestPrice);
+    event LotteryWinnersSelected(address[] winners, bool fundsDistributed, string reason);
 
     // ============================================
     // ERRORS
@@ -275,7 +276,9 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Execute lottery and distribute prizes
+     * @dev Execute lottery and select winners
+     * If funds are available, distribute prizes automatically
+     * If funds are insufficient, only mark winners without transferring funds
      * Uses block-based randomness (secure on Base)
      */
     function executeLottery() external onlyOwner nonReentrant {
@@ -309,29 +312,41 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
 
         uint256 totalPrizeAmount = winnersCount * currentTier.prizePerWinner;
         
-        if (address(this).balance < totalPrizeAmount) revert InsufficientFunds();
+        // Check if funds have been deposited
+        bool hasFundsDeposited = address(this).balance >= totalPrizeAmount;
 
-        // Distribute prizes using safe transfer (Checks-Effects-Interactions pattern)
-        for (uint256 i = 0; i < winners.length; i++) {
-            address winner = winners[i];
-            uint256 prize = currentTier.prizePerWinner;
-            
-            // Effects: Update state before external calls
-            isWinner[winner] = true;
-            
-            // Interactions: Safe ETH transfer
-            payable(winner).sendValue(prize);
-            emit PrizeDistributed(winner, prize);
+        if (hasFundsDeposited) {
+            // Case 1: Funds are available - distribute prizes
+            for (uint256 i = 0; i < winners.length; i++) {
+                address winner = winners[i];
+                uint256 prize = currentTier.prizePerWinner;
+                
+                // Effects: Update state before external calls
+                isWinner[winner] = true;
+                
+                // Interactions: Safe ETH transfer
+                payable(winner).sendValue(prize);
+                emit PrizeDistributed(winner, prize);
+            }
+
+            // Return remaining funds to depositor
+            uint256 remainingFunds = address(this).balance;
+            if (remainingFunds > 0 && depositor != address(0)) {
+                payable(depositor).sendValue(remainingFunds);
+                emit RemainingFundsReturned(depositor, remainingFunds);
+            }
+
+            emit LotteryExecuted(winners, currentTier.prizePerWinner, block.timestamp);
+            emit LotteryWinnersSelected(winners, true, "Funds distributed successfully");
+        } else {
+            // Case 2: No funds deposited - only mark winners
+            for (uint256 i = 0; i < winners.length; i++) {
+                isWinner[winners[i]] = true;
+            }
+
+            emit LotteryExecuted(winners, currentTier.prizePerWinner, block.timestamp);
+            emit LotteryWinnersSelected(winners, false, "No funds deposited - winners selected only");
         }
-
-        // Return remaining funds to depositor
-        uint256 remainingFunds = address(this).balance;
-        if (remainingFunds > 0 && depositor != address(0)) {
-            payable(depositor).sendValue(remainingFunds);
-            emit RemainingFundsReturned(depositor, remainingFunds);
-        }
-
-        emit LotteryExecuted(winners, currentTier.prizePerWinner, block.timestamp);
     }
 
     /**
