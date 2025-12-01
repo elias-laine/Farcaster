@@ -9,9 +9,28 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 /**
+ * @title AggregatorV3Interface
+ * @dev Chainlink price feed interface for dynamic pricing
+ */
+interface AggregatorV3Interface {
+    function latestRoundData()
+        external
+        view
+        returns (
+            uint80 roundId,
+            int256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        );
+
+    function decimals() external view returns (uint8);
+}
+
+/**
  * @title SocialQuest
- * @dev Combined Soulbound Token (SBT) + Lottery contract with secure randomness
- * @notice ✅ SECURITY: Reentrancy protection, Address.sendValue, immutable parameters
+ * @dev Combined Soulbound Token (SBT) + Lottery contract with dynamic prize pricing
+ * @notice ✅ SECURITY: Reentrancy protection, Address.sendValue, Chainlink price feed
  */
 contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     using ECDSA for bytes32;
@@ -25,7 +44,7 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
         uint256 minParticipants;
         uint256 maxParticipants;
         uint256 winnersCount;
-        uint256 prizePerWinner;
+        uint256 prizePerWinner; // Will be calculated dynamically in wei
     }
 
     // ============================================
@@ -52,6 +71,12 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     bool public isExecuted = false;
 
     // ============================================
+    // CHAINLINK PRICE FEED
+    // ============================================
+    AggregatorV3Interface public priceFeed;
+    uint256 public constant USD_PRIZE_AMOUNT = 5 * 10**18; // $5 in wei format (5 * 10^18)
+
+    // ============================================
     // EVENTS
     // ============================================
     event SBTMinted(address indexed to, uint256 indexed tokenId, uint256 timestamp);
@@ -62,6 +87,7 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     event PrizeDistributed(address indexed winner, uint256 amount);
     event RemainingFundsReturned(address indexed depositor, uint256 amount);
     event EmergencyWithdrawal(address indexed depositor, uint256 amount);
+    event PriceUpdated(int256 latestPrice);
 
     // ============================================
     // ERRORS
@@ -80,26 +106,83 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     error InvalidDeadline();
     error InsufficientFunds();
     error TransferFailed();
+    error StalePrice();
 
     constructor(
         address _signer,
         uint256 _deadline,
         string memory _name,
         string memory _symbol,
-        string memory baseURI_
+        string memory baseURI_,
+        address _priceFeed
     ) ERC721(_name, _symbol) Ownable(msg.sender) {
         if (_signer == address(0)) revert ZeroAddress();
         if (_deadline <= block.timestamp) revert InvalidDeadline();
+        if (_priceFeed == address(0)) revert ZeroAddress();
         
         signer = _signer;
         deadline = _deadline;
         _baseTokenURI = baseURI_;
+        priceFeed = AggregatorV3Interface(_priceFeed);
 
-        // Initialize default prize tiers
-        prizeTiers.push(PrizeTier({ minParticipants: 0, maxParticipants: 99, winnersCount: 1, prizePerWinner: 5 ether }));
-        prizeTiers.push(PrizeTier({ minParticipants: 100, maxParticipants: 499, winnersCount: 2, prizePerWinner: 5 ether }));
-        prizeTiers.push(PrizeTier({ minParticipants: 500, maxParticipants: 999, winnersCount: 3, prizePerWinner: 5 ether }));
-        prizeTiers.push(PrizeTier({ minParticipants: 1000, maxParticipants: 0, winnersCount: 4, prizePerWinner: 5 ether }));
+        // Initialize default prize tiers with calculated prizes
+        // Prize amount will be calculated based on current ETH/USD price
+        uint256 prizeInWei = getEthAmountForUsd(USD_PRIZE_AMOUNT);
+        
+        prizeTiers.push(PrizeTier({ minParticipants: 0, maxParticipants: 99, winnersCount: 1, prizePerWinner: prizeInWei }));
+        prizeTiers.push(PrizeTier({ minParticipants: 100, maxParticipants: 499, winnersCount: 2, prizePerWinner: prizeInWei }));
+        prizeTiers.push(PrizeTier({ minParticipants: 500, maxParticipants: 999, winnersCount: 3, prizePerWinner: prizeInWei }));
+        prizeTiers.push(PrizeTier({ minParticipants: 1000, maxParticipants: 0, winnersCount: 4, prizePerWinner: prizeInWei }));
+    }
+
+    // ============================================
+    // CHAINLINK PRICE FEED FUNCTIONS
+    // ============================================
+
+    /**
+     * @dev Get current ETH/USD price from Chainlink
+     * @return price The ETH/USD price in wei (scaled to 18 decimals)
+     */
+    function getLatestPrice() public view returns (int256) {
+        (, int256 price, , uint256 updatedAt, ) = priceFeed.latestRoundData();
+        
+        // Ensure price is not stale (not older than 1 hour)
+        if (block.timestamp - updatedAt > 3600) revert StalePrice();
+        
+        return price;
+    }
+
+    /**
+     * @dev Convert USD amount to ETH amount based on current price
+     * @param usdAmount Amount in USD (scaled to 18 decimals)
+     * @return ethAmount Amount in ETH (wei)
+     */
+    function getEthAmountForUsd(uint256 usdAmount) public view returns (uint256) {
+        int256 price = getLatestPrice();
+        require(price > 0, "Invalid price");
+        
+        uint8 decimals = priceFeed.decimals();
+        uint256 priceScaled = uint256(price);
+        
+        // Calculate: usdAmount / price (with proper decimal handling)
+        // Price feed returns price in 8 decimals typically
+        // Formula: (usdAmount * 10^8) / price
+        uint256 ethAmount = (usdAmount * (10 ** decimals)) / priceScaled;
+        
+        return ethAmount;
+    }
+
+    /**
+     * @dev Update prize tiers with fresh ETH price
+     */
+    function updatePrizeAmounts() external onlyOwner {
+        uint256 freshPrizeInWei = getEthAmountForUsd(USD_PRIZE_AMOUNT);
+        
+        for (uint256 i = 0; i < prizeTiers.length; i++) {
+            prizeTiers[i].prizePerWinner = freshPrizeInWei;
+        }
+        
+        emit PriceUpdated(getLatestPrice());
     }
 
     // ============================================
