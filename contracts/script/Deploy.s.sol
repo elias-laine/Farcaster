@@ -44,7 +44,7 @@ contract DeployScript is Script {
         console.log("Signer:", signer);
         console.log("Deadline:", deadline);
         console.log("Base URI:", baseURI);
-        console.log("Chainlink Price Feed: 0x71041dddad3287f3d7d07f0b6f1d4e1d493b0331");
+        console.log("Chainlink Price Feed: 0x71041dDDAD3287F3D7D07F0B6f1D4E1d493B0331");
         console.log("\nContract deployed successfully!");
         console.log("CONTRACT_ADDRESS:", address(socialQuest));
 
