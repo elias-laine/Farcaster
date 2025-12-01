@@ -125,14 +125,15 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
         deadline = _deadline;
         _baseTokenURI = baseURI_;
 
-        // Initialize default prize tiers with calculated prizes
-        // Prize amount will be calculated based on current ETH/USD price
-        uint256 prizeInWei = getEthAmountForUsd(USD_PRIZE_AMOUNT);
+        // Initialize default prize tiers with default prize amount (~$5 USD at current ETH price)
+        // Default: 0.002 ETH (approximately $5 at $2,500/ETH)
+        // Call updatePrizeAmounts() after deployment to set the correct amount based on current price
+        uint256 defaultPrizeInWei = 2 * 10**15;  // 0.002 ETH
         
-        prizeTiers.push(PrizeTier({ minParticipants: 0, maxParticipants: 99, winnersCount: 1, prizePerWinner: prizeInWei }));
-        prizeTiers.push(PrizeTier({ minParticipants: 100, maxParticipants: 499, winnersCount: 2, prizePerWinner: prizeInWei }));
-        prizeTiers.push(PrizeTier({ minParticipants: 500, maxParticipants: 999, winnersCount: 3, prizePerWinner: prizeInWei }));
-        prizeTiers.push(PrizeTier({ minParticipants: 1000, maxParticipants: 0, winnersCount: 4, prizePerWinner: prizeInWei }));
+        prizeTiers.push(PrizeTier({ minParticipants: 0, maxParticipants: 99, winnersCount: 1, prizePerWinner: defaultPrizeInWei }));
+        prizeTiers.push(PrizeTier({ minParticipants: 100, maxParticipants: 499, winnersCount: 2, prizePerWinner: defaultPrizeInWei }));
+        prizeTiers.push(PrizeTier({ minParticipants: 500, maxParticipants: 999, winnersCount: 3, prizePerWinner: defaultPrizeInWei }));
+        prizeTiers.push(PrizeTier({ minParticipants: 1000, maxParticipants: 0, winnersCount: 4, prizePerWinner: defaultPrizeInWei }));
     }
 
     // ============================================

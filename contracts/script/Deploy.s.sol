@@ -45,8 +45,13 @@ contract DeployScript is Script {
         console.log("Deadline:", deadline);
         console.log("Base URI:", baseURI);
         console.log("Chainlink Price Feed: 0x71041dDDAD3287F3D7D07F0B6f1D4E1d493B0331");
-        console.log("\nContract deployed successfully!");
+        console.log("\n=== CONTRACT DEPLOYED SUCCESSFULLY ===");
         console.log("CONTRACT_ADDRESS:", address(socialQuest));
+        console.log("\n=== NEXT STEPS ===");
+        console.log("1. Copy CONTRACT_ADDRESS from above");
+        console.log("2. Update client/src/lib/config.ts with CONTRACT_ADDRESS");
+        console.log("3. Call updatePrizeAmounts() on the contract to set exact $5 USD prices");
+        console.log("   (This ensures prizes match current ETH/USD rate from Chainlink)");
 
         vm.stopBroadcast();
     }
