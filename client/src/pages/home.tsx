@@ -176,6 +176,14 @@ export default function Home() {
     checkOnChainMint();
   }, [walletAddress]);
 
+  // Refetch progress and mint status after page reload
+  useEffect(() => {
+    if (isReady && user?.fid && walletAddress) {
+      console.log("[Home] Page ready - refetching progress and mint status");
+      refetchProgress();
+    }
+  }, [isReady]);
+
   // Fetch lottery stats again after mint
   const { refetch: refetchLotteryStats } = useQuery<LotteryStatsType>({
     queryKey: ["/api/lottery-stats-refresh"],
