@@ -287,6 +287,9 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
         if (block.timestamp <= deadline) revert DeadlineNotPassed();
         if (participants.length == 0) revert NoParticipants();
 
+        // Update prize amounts based on fresh Chainlink price feed
+        updatePrizeAmounts();
+
         isActive = false;
         isExecuted = true;
 
