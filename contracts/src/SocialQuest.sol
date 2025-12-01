@@ -73,7 +73,9 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     // ============================================
     // CHAINLINK PRICE FEED
     // ============================================
-    AggregatorV3Interface public priceFeed;
+    // Base Mainnet ETH/USD Price Feed
+    AggregatorV3Interface public constant priceFeed = 
+        AggregatorV3Interface(0x71041dddad3287f3d7d07f0b6f1d4e1d493b0331);
     uint256 public constant USD_PRIZE_AMOUNT = 5 * 10**18; // $5 in wei format (5 * 10^18)
 
     // ============================================
@@ -113,17 +115,14 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
         uint256 _deadline,
         string memory _name,
         string memory _symbol,
-        string memory baseURI_,
-        address _priceFeed
+        string memory baseURI_
     ) ERC721(_name, _symbol) Ownable(msg.sender) {
         if (_signer == address(0)) revert ZeroAddress();
         if (_deadline <= block.timestamp) revert InvalidDeadline();
-        if (_priceFeed == address(0)) revert ZeroAddress();
         
         signer = _signer;
         deadline = _deadline;
         _baseTokenURI = baseURI_;
-        priceFeed = AggregatorV3Interface(_priceFeed);
 
         // Initialize default prize tiers with calculated prizes
         // Prize amount will be calculated based on current ETH/USD price

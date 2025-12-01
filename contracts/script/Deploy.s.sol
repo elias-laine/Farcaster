@@ -26,31 +26,25 @@ contract DeployScript is Script {
         
         string memory baseURI = vm.envString("BASE_URI");
         
-        // Get Chainlink price feed address based on chain
-        // For Base Mainnet (8453), use the mainnet feed
-        // For Base Sepolia (84532), use the sepolia feed
-        address priceFeed = vm.envOr("PRICE_FEED", address(0x71041dddad3287f3d7d07f0b6f1d4e1d493b0331));
-        console.log("Using Chainlink Price Feed at:", priceFeed);
-        
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy combined SocialQuest contract with price feed
+        // Deploy combined SocialQuest contract
+        // Chainlink price feed is hardcoded to Base Mainnet ETH/USD: 0x71041dddad3287f3d7d07f0b6f1d4e1d493b0331
         SocialQuest socialQuest = new SocialQuest(
             signer,
             deadline,
             "Social Quest SBT",
             "SQSBT",
-            baseURI,
-            priceFeed
+            baseURI
         );
         
         console.log("SocialQuest deployed at:", address(socialQuest));
         console.log("Signer:", signer);
         console.log("Deadline:", deadline);
         console.log("Base URI:", baseURI);
-        console.log("Price Feed:", priceFeed);
+        console.log("Chainlink Price Feed: 0x71041dddad3287f3d7d07f0b6f1d4e1d493b0331");
         console.log("\nContract deployed successfully!");
         console.log("CONTRACT_ADDRESS:", address(socialQuest));
 
