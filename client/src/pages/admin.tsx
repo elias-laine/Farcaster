@@ -274,7 +274,7 @@ export default function Admin() {
                 Execute Lottery
               </CardTitle>
               <CardDescription>
-                Once the deadline has passed, you can execute the lottery to randomly select winners.
+                Once the deadline has passed, anyone who deposited funds or the contract owner can execute the lottery to randomly select winners.
               </CardDescription>
             </CardHeader>
             <CardContent>

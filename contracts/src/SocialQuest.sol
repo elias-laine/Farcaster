@@ -110,6 +110,7 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     error InsufficientFunds();
     error TransferFailed();
     error StalePrice();
+    error NotAuthorized();
 
     constructor(
         address _signer,
@@ -278,11 +279,15 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
 
     /**
      * @dev Execute lottery and select winners
+     * Can be called by contract owner or depositor (who funded the prizes)
      * If funds are available, distribute prizes automatically
      * If funds are insufficient, only mark winners without transferring funds
      * Uses block-based randomness (secure on Base)
      */
-    function executeLottery() external onlyOwner nonReentrant {
+    function executeLottery() external nonReentrant {
+        // Authorization: only owner or depositor can execute
+        if (msg.sender != owner() && msg.sender != depositor) revert NotAuthorized();
+        
         if (isExecuted) revert LotteryAlreadyExecuted();
         if (block.timestamp <= deadline) revert DeadlineNotPassed();
         if (participants.length == 0) revert NoParticipants();
