@@ -89,6 +89,24 @@ const SOCIALQUEST_CONTRACT_ABI = [
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
+  {
+    name: "getAllPrizeTiers",
+    type: "function",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "tuple[]",
+        components: [
+          { name: "minParticipants", type: "uint256" },
+          { name: "maxParticipants", type: "uint256" },
+          { name: "winnersCount", type: "uint256" },
+          { name: "prizePerWinner", type: "uint256" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
 ] as const;
 
 // Extended ABI just for reading owner
@@ -499,6 +517,55 @@ export async function registerRoutes(
       return res.status(500).json({ 
         success: false, 
         message: "Internal server error" 
+      });
+    }
+  });
+
+  // ============================================
+  // GET PRIZE TIERS (from Smart Contract)
+  // ============================================
+  app.get("/api/prize-tiers", async (req, res) => {
+    try {
+      if (!CONFIG.CONTRACT_ADDRESS) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Contract not deployed yet" 
+        });
+      }
+
+      const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
+      const contract = new ethers.Contract(
+        CONFIG.CONTRACT_ADDRESS,
+        SOCIALQUEST_CONTRACT_ABI,
+        provider
+      );
+
+      const tiers = await contract.getAllPrizeTiers();
+      
+      // Convert tiers to USD for display
+      const tiersWithUsd = await Promise.all(
+        tiers.map(async (tier: any) => {
+          const prizeInUsd = await weiToUsd(tier.prizePerWinner);
+          return {
+            minParticipants: Number(tier.minParticipants),
+            maxParticipants: Number(tier.maxParticipants),
+            winnersCount: Number(tier.winnersCount),
+            prizePerWinner: tier.prizePerWinner.toString(),
+            prizePerWinnerUsd: Math.round(prizeInUsd * 100) / 100,
+          };
+        })
+      );
+
+      return res.json({
+        success: true,
+        tiers: tiersWithUsd,
+      });
+    } catch (error) {
+      console.error("Error getting prize tiers:", error);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Failed to fetch prize tiers",
+        details: error instanceof Error ? error.message : String(error),
       });
     }
   });

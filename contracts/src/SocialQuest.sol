@@ -437,4 +437,11 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     function getPrizeTiersCount() public view returns (uint256) {
         return prizeTiers.length;
     }
+
+    /**
+     * @dev Get all prize tiers with current prize amounts
+     */
+    function getAllPrizeTiers() public view returns (PrizeTier[] memory) {
+        return prizeTiers;
+    }
 }
