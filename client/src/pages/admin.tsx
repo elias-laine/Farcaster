@@ -79,13 +79,6 @@ export default function Admin() {
     queryKey: ["/api/admin/participants"],
   });
 
-  // Fetch prize tiers
-  const { 
-    data: prizeTiersData, 
-    isLoading: isLoadingTiers,
-  } = useQuery<{ success: boolean; tiers: PrizeTier[] }>({
-    queryKey: ["/api/prize-tiers"],
-  });
 
   const handleExecuteLottery = async () => {
     try {
@@ -187,7 +180,6 @@ export default function Admin() {
               onClick={() => {
                 queryClient.invalidateQueries({ queryKey: ["/api/lottery-stats"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/admin/participants"] });
-                queryClient.invalidateQueries({ queryKey: ["/api/prize-tiers"] });
               }}
               data-testid="button-refresh-admin"
             >
@@ -364,63 +356,6 @@ export default function Admin() {
             </CardContent>
           </Card>
         )}
-
-        {/* Prize Tiers Section */}
-        <Card className="border" data-testid="card-prize-tiers">
-          <CardHeader>
-            <CardTitle>Prize Tiers</CardTitle>
-            <CardDescription>
-              Dynamic prize structure based on participant count and current ETH price
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingTiers ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4].map((i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            ) : prizeTiersData?.tiers && prizeTiersData.tiers.length > 0 ? (
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Participants</TableHead>
-                      <TableHead>Winners</TableHead>
-                      <TableHead>Prize/Winner</TableHead>
-                      <TableHead className="text-right">Total Prize</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {prizeTiersData.tiers.map((tier, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          {tier.minParticipants === 0 && tier.maxParticipants === 0
-                            ? "1000+"
-                            : tier.maxParticipants === 0
-                            ? `${tier.minParticipants}+`
-                            : `${tier.minParticipants}-${tier.maxParticipants}`}
-                        </TableCell>
-                        <TableCell className="font-semibold">{tier.winnersCount}</TableCell>
-                        <TableCell className="text-success font-semibold">
-                          ${tier.prizePerWinnerUsd}
-                        </TableCell>
-                        <TableCell className="text-right text-success font-semibold">
-                          ${(tier.prizePerWinnerUsd * tier.winnersCount).toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Trophy className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No prize tiers available</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Participants Table */}
         <Card className="border" data-testid="card-participants">

@@ -5,9 +5,10 @@ import { TaskCard } from "@/components/TaskCard";
 import { ProgressIndicator } from "@/components/ProgressIndicator";
 import { MintSection } from "@/components/MintSection";
 import { LotteryStats } from "@/components/LotteryStats";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Zap } from "lucide-react";
+import { AlertCircle, Zap, Trophy } from "lucide-react";
 import { useFarcaster } from "@/lib/farcaster";
 import { APP_CONFIG } from "@/lib/config";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,14 @@ interface AppConfig {
   contractAddress: string;
   chainId: number;
   rpcUrl: string;
+}
+
+interface PrizeTier {
+  minParticipants: number;
+  maxParticipants: number;
+  winnersCount: number;
+  prizePerWinner: string;
+  prizePerWinnerUsd: number;
 }
 
 export default function Home() {
@@ -54,6 +63,14 @@ export default function Home() {
     error: lotteryStatsError,
   } = useQuery<LotteryStatsType>({
     queryKey: ["/api/lottery-stats"],
+  });
+
+  // Fetch prize tiers
+  const { 
+    data: prizeTiersData, 
+    isLoading: isLoadingTiers,
+  } = useQuery<{ success: boolean; tiers: PrizeTier[] }>({
+    queryKey: ["/api/prize-tiers"],
   });
 
   // Verify task mutation
@@ -312,6 +329,69 @@ export default function Home() {
             </div>
           </section>
         )}
+
+        {/* Prize Tiers Section */}
+        <section data-testid="section-prize-tiers">
+          <h2 className="text-xl font-semibold mb-4">Prize Tiers</h2>
+          <Card className="border">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-success" />
+                Prize Structure
+              </CardTitle>
+              <CardDescription>
+                Dynamic prizes based on participant count and current ETH price
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingTiers ? (
+                <div className="space-y-2">
+                  {[1, 2, 3, 4].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : prizeTiersData?.tiers && prizeTiersData.tiers.length > 0 ? (
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Participants</TableHead>
+                        <TableHead>Winners</TableHead>
+                        <TableHead>Prize/Winner</TableHead>
+                        <TableHead className="text-right">Total Prize</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {prizeTiersData.tiers.map((tier, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            {tier.minParticipants === 0 && tier.maxParticipants === 0
+                              ? "1000+"
+                              : tier.maxParticipants === 0
+                              ? `${tier.minParticipants}+`
+                              : `${tier.minParticipants}-${tier.maxParticipants}`}
+                          </TableCell>
+                          <TableCell className="font-semibold">{tier.winnersCount}</TableCell>
+                          <TableCell className="text-success font-semibold">
+                            ${tier.prizePerWinnerUsd}
+                          </TableCell>
+                          <TableCell className="text-right text-success font-semibold">
+                            ${(tier.prizePerWinnerUsd * tier.winnersCount).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Trophy className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>Prize tiers loading...</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
 
         {/* Lottery Stats */}
         <section data-testid="section-lottery-stats">
