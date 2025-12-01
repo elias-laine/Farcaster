@@ -176,7 +176,7 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     /**
      * @dev Update prize tiers with fresh ETH price
      */
-    function updatePrizeAmounts() external onlyOwner {
+    function updatePrizeAmounts() public onlyOwner {
         uint256 freshPrizeInWei = getEthAmountForUsd(USD_PRIZE_AMOUNT);
         
         for (uint256 i = 0; i < prizeTiers.length; i++) {
