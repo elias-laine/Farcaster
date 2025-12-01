@@ -348,13 +348,20 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
             emit LotteryExecuted(winners, currentTier.prizePerWinner, block.timestamp);
             emit LotteryWinnersSelected(winners, true, "Funds distributed successfully");
         } else {
-            // Case 2: No funds deposited - only mark winners
+            // Case 2: Insufficient funds - mark winners and return remaining funds to depositor
             for (uint256 i = 0; i < winners.length; i++) {
                 isWinner[winners[i]] = true;
             }
 
+            // Return remaining funds to depositor
+            uint256 remainingFunds = address(this).balance;
+            if (remainingFunds > 0 && depositor != address(0)) {
+                payable(depositor).sendValue(remainingFunds);
+                emit RemainingFundsReturned(depositor, remainingFunds);
+            }
+
             emit LotteryExecuted(winners, currentTier.prizePerWinner, block.timestamp);
-            emit LotteryWinnersSelected(winners, false, "No funds deposited - winners selected only");
+            emit LotteryWinnersSelected(winners, false, "Insufficient funds - winners selected only");
         }
     }
 
