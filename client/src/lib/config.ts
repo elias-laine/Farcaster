@@ -15,12 +15,12 @@ const getEnvVarNumber = (name: string, defaultValue: number = 0): number => {
 
 export const APP_CONFIG = {
   // Cast to like and recast
-  castHash: getEnvVar("CAST_HASH", "0x28a80f62f8053b21fc247c68c8c62c2b4260ccc6"),
-  castUrl: getEnvVar("CAST_URL", "https://farcaster.com/hossein2001/0x28a80f62"),
+  castHash: getEnvVar("CAST_HASH", "0xba8fa3569d4373a98323035ba4b7c66574575e94"),
+  castUrl: getEnvVar("CAST_URL", "https://farcaster.xyz/book/0xba8fa356"),
   
   // Account to follow
-  targetFid: getEnvVarNumber("TARGET_FID", 958667),
-  targetUsername: getEnvVar("TARGET_USERNAME", "hossein2001"),
+  targetFid: getEnvVarNumber("TARGET_FID", 14675),
+  targetUsername: getEnvVar("TARGET_USERNAME", "book"),
   
   // ============================================
   // SMART CONTRACT ADDRESSES
