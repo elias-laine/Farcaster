@@ -89,6 +89,11 @@ const SOCIALQUEST_CONTRACT_ABI = [
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
+] as const;
+
+// Extended ABI just for reading owner
+const EXTENDED_ABI = [
+  ...SOCIALQUEST_CONTRACT_ABI,
   {
     name: "owner",
     type: "function",
@@ -581,6 +586,42 @@ export async function registerRoutes(
       console.error("[Demo] Populate test data error:", error);
       return res.status(500).json({
         error: "Failed to populate test data",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // ============================================
+  // DEBUG: Simple owner check endpoint
+  // ============================================
+  app.get("/api/debug/owner", async (req, res) => {
+    try {
+      if (!CONFIG.CONTRACT_ADDRESS) {
+        return res.status(400).json({
+          error: "Contract address not configured",
+        });
+      }
+
+      const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
+      const contract = new ethers.Contract(
+        CONFIG.CONTRACT_ADDRESS,
+        EXTENDED_ABI,
+        provider
+      );
+
+      console.log("[Debug Owner] Attempting to read owner from contract...");
+      const owner = await contract.owner();
+      console.log("[Debug Owner] Successfully read owner:", owner);
+
+      return res.json({
+        contractAddress: CONFIG.CONTRACT_ADDRESS,
+        owner,
+        rpcUrl: CONFIG.RPC_URL,
+      });
+    } catch (error) {
+      console.error("[Debug] Owner fetch error:", error);
+      return res.status(500).json({
+        error: "Failed to fetch owner",
         details: error instanceof Error ? error.message : String(error),
       });
     }
