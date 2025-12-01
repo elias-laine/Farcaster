@@ -3,8 +3,17 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Trophy, DollarSign, Clock, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { LotteryStats as LotteryStatsType, LotteryTier } from "@shared/schema";
 import { LOTTERY_TIERS } from "@shared/schema";
+
+interface PrizeTier {
+  minParticipants: number;
+  maxParticipants: number;
+  winnersCount: number;
+  prizePerWinner: string;
+  prizePerWinnerUsd: number;
+}
 
 interface LotteryStatsProps {
   stats: LotteryStatsType | null;
@@ -51,6 +60,11 @@ function getNextTierThreshold(currentParticipants: number): number | null {
 
 export function LotteryStats({ stats, isLoading }: LotteryStatsProps) {
   const [timeRemaining, setTimeRemaining] = useState<string>("");
+  
+  // Fetch live prize tiers from smart contract
+  const { data: prizeTiersData, isLoading: isLoadingTiers } = useQuery<{ success: boolean; tiers: PrizeTier[] }>({
+    queryKey: ["/api/prize-tiers"],
+  });
   
   useEffect(() => {
     if (!stats?.deadline) return;
@@ -199,46 +213,57 @@ export function LotteryStats({ stats, isLoading }: LotteryStatsProps) {
         </Card>
       )}
 
-      {/* Prize Tiers Info */}
+      {/* Prize Tiers Info - Live from Smart Contract */}
       <Card className="border">
         <CardContent className="p-4">
           <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
             <Trophy className="h-4 w-4 text-primary" />
             Prize Tiers
           </h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {LOTTERY_TIERS.map((tier, index) => {
-              const isActive = stats.currentTier.minParticipants === tier.minParticipants;
-              return (
+          {isLoadingTiers ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          ) : prizeTiersData?.tiers && prizeTiersData.tiers.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {prizeTiersData.tiers.map((tier, index) => (
                 <div 
                   key={index}
                   className={`p-3 rounded-lg border ${
-                    isActive 
+                    stats.currentTier.winnersCount === tier.winnersCount
                       ? "border-primary bg-primary/5" 
                       : "border-border bg-muted/30"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs font-medium ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+                    <span className={`text-xs font-medium ${stats.currentTier.winnersCount === tier.winnersCount ? "text-primary" : "text-muted-foreground"}`}>
                       Tier {index + 1}
                     </span>
-                    {isActive && (
+                    {stats.currentTier.winnersCount === tier.winnersCount && (
                       <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
                         Active
                       </Badge>
                     )}
                   </div>
-                  <p className="text-lg font-bold">${tier.totalPrize}</p>
+                  <p className="text-lg font-bold">${(tier.prizePerWinnerUsd * tier.winnersCount).toFixed(2)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {tier.winnersCount}x ${tier.prizePerWinner}
+                    {tier.winnersCount}x ${tier.prizePerWinnerUsd}
                   </p>
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    {tier.minParticipants}+ participants
+                    {tier.minParticipants === 0 && tier.maxParticipants === 0
+                      ? "1000+ participants"
+                      : tier.maxParticipants === 0
+                      ? `${tier.minParticipants}+ participants`
+                      : `${tier.minParticipants}-${tier.maxParticipants} participants`}
                   </p>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Prize tiers loading...</p>
+          )}
         </CardContent>
       </Card>
     </div>
