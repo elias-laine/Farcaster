@@ -9,10 +9,9 @@
     "name": "Social Quest",
     "iconUrl": "https://socialquest-sbt1.onrender.com/favicon.png",
     "homeUrl": "https://socialquest-sbt1.onrender.com/",
-    "imageUrl": "https://your-domain.com/og-image.png",
+    "imageUrl": "https://socialquest-sbt1.onrender.com/image.jpg",
     "buttonTitle": "Start Quest",
-    "splashImageUrl": "https://your-domain.com/splash.png",
+    "splashImageUrl": "https://socialquest-sbt1.onrender.com/splash.jpg",
     "splashBackgroundColor": "#7c3aed",
-    "webhookUrl": "https://your-domain.com/api/webhook"
   }
 }
