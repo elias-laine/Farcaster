@@ -7,8 +7,8 @@
   "frame": {
     "version": "1",
     "name": "Social Quest",
-    "iconUrl": "https://your-domain.com/icon.png",
-    "homeUrl": "https://your-domain.com",
+    "iconUrl": "https://socialquest-sbt1.onrender.com/favicon.png",
+    "homeUrl": "https://socialquest-sbt1.onrender.com/",
     "imageUrl": "https://your-domain.com/og-image.png",
     "buttonTitle": "Start Quest",
     "splashImageUrl": "https://your-domain.com/splash.png",
