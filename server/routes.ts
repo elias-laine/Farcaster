@@ -865,7 +865,7 @@ const CHAINLINK_FEED_ABI = [
 async function weiToUsd(weiAmount: bigint): Promise<number> {
   try {
     const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
-    const priceFeedAddress = "0x71041dDDAD3287F3D7D07F0B6f1D4E1d493B0331"; // Base Mainnet ETH/USD
+    const priceFeedAddress = "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70"; // Base Mainnet ETH/USD
     const priceFeed = new ethers.Contract(priceFeedAddress, CHAINLINK_FEED_ABI, provider);
     
     const [, answer] = await priceFeed.latestRoundData();
