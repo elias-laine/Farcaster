@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { verifyTaskRequestSchema, mintSignatureRequestSchema } from "@shared/schema";
+import { verifyTaskRequestSchema } from "@shared/schema";
 import { ethers } from "ethers";
 
 // ============================================
@@ -34,19 +34,19 @@ const CONFIG = {
   CONTRACT_ADDRESS: process.env.VITE_CONTRACT_ADDRESS || process.env.CONTRACT_ADDRESS || "",
 
   // RPC URL for blockchain queries (Base Mainnet or Sepolia)
-  RPC_URL: process.env.RPC_URL || "https://mainnet.base.org",
+  // Fallback to VITE_RPC_URL if RPC_URL is not set (useful for frontend-focused envs)
+  RPC_URL: process.env.RPC_URL || process.env.VITE_RPC_URL || "https://mainnet.base.org",
 
   // Chain ID (8453 = Base Mainnet, 84532 = Base Sepolia)
   CHAIN_ID: parseInt(process.env.CHAIN_ID || "8453"),
 };
 
 // Debug log config
+console.log("==================================================");
 console.log("[CONFIG] NEYNAR_API_KEY exists:", !!CONFIG.NEYNAR_API_KEY);
-console.log("[CONFIG] CAST_HASH:", CONFIG.CAST_HASH);
-console.log("[CONFIG] TARGET_FID:", CONFIG.TARGET_FID);
-console.log("[CONFIG] SIGNER_PRIVATE_KEY exists:", !!CONFIG.SIGNER_PRIVATE_KEY);
 console.log("[CONFIG] CONTRACT_ADDRESS:", CONFIG.CONTRACT_ADDRESS);
-console.log("[CONFIG] RPC_URL:", CONFIG.RPC_URL);
+console.log("[CONFIG] RPC_URL in use:", CONFIG.RPC_URL);
+console.log("==================================================");
 
 // Neynar API base URL
 const NEYNAR_API_URL = "https://api.neynar.com/v2/farcaster";
@@ -283,10 +283,8 @@ export async function registerRoutes(
           message = verified ? "Follow verified!" : "Not following yet. Please follow the account first.";
         }
       } catch (error) {
-        // This catch block handles thrown configuration errors (e.g., missing CAST_HASH)
         console.error(`Error verifying ${taskType}:`, error);
 
-        // If it's a known configuration error, send a specific message
         if (error instanceof Error && error.message.includes("Missing configuration")) {
             return res.status(500).json({
                 success: false,
@@ -336,7 +334,6 @@ export async function registerRoutes(
     try {
       const { walletAddress, fid } = req.body;
 
-      // Validate required fields
       if (!walletAddress || !fid) {
         return res.status(400).json({ 
           success: false, 
@@ -344,7 +341,6 @@ export async function registerRoutes(
         });
       }
 
-      // Ensure signer private key is configured
       if (!CONFIG.SIGNER_PRIVATE_KEY) {
         console.error("SIGNER_PRIVATE_KEY not configured");
         return res.status(500).json({ 
@@ -353,7 +349,6 @@ export async function registerRoutes(
         });
       }
 
-      // Ensure contract address is configured
       if (!CONFIG.CONTRACT_ADDRESS) {
         console.error("CONTRACT_ADDRESS not configured");
         return res.status(500).json({ 
@@ -362,7 +357,6 @@ export async function registerRoutes(
         });
       }
 
-      // Get user progress with both fid and walletAddress
       const progress = await storage.getUserProgress(fid, walletAddress);
 
       if (!progress) {
@@ -372,7 +366,6 @@ export async function registerRoutes(
         });
       }
 
-      // Check if all tasks are completed (anti-cheat check)
       if (!progress.allTasksCompleted) {
         return res.status(403).json({ 
           success: false, 
@@ -380,7 +373,8 @@ export async function registerRoutes(
         });
       }
 
-      // Check if already minted (This is the final block)
+      // 💡 UX FIX: We ONLY check if they have actually minted on-chain.
+      // We removed the `signatureIssued` check to allow retries if tx is cancelled.
       if (progress.mintedAt) {
         return res.status(400).json({ 
           success: false, 
@@ -388,7 +382,7 @@ export async function registerRoutes(
         });
       }
 
-      // Generate nonce
+      // Generate a fresh nonce for every attempt
       const nonce = await storage.generateNonce();
 
       // Generate signature
@@ -398,13 +392,11 @@ export async function registerRoutes(
         CONFIG.CONTRACT_ADDRESS
       );
 
-      // We no longer mark the signature as issued here. The user can retry.
-
       return res.json({ 
         success: true, 
         signature,
         nonce,
-        message: "Signature generated successfully (ready for transaction)" 
+        message: "Signature generated successfully" 
       });
     } catch (error) {
       console.error("Error generating mint signature:", error);
@@ -416,7 +408,7 @@ export async function registerRoutes(
   });
 
   // ============================================
-  // VERIFY OWNER OR DEPOSITOR (Check if wallet can execute lottery)
+  // VERIFY OWNER OR DEPOSITOR
   // ============================================
   app.post("/api/verify-owner", async (req, res) => {
     try {
@@ -430,10 +422,6 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Contract address not configured" });
       }
 
-      console.log("[Verify Owner] Checking wallet:", walletAddress);
-      console.log("[Verify Owner] Contract:", CONFIG.CONTRACT_ADDRESS);
-      console.log("[Verify Owner] RPC URL:", CONFIG.RPC_URL);
-
       const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
       const contract = new ethers.Contract(
         CONFIG.CONTRACT_ADDRESS,
@@ -441,18 +429,9 @@ export async function registerRoutes(
         provider
       );
 
-      console.log("[Verify Owner] Calling contract.owner()...");
       const contractOwner = await contract.owner();
-      console.log("[Verify Owner] Got owner:", contractOwner);
-
       const isOwner = contractOwner.toLowerCase() === walletAddress.toLowerCase();
 
-      // Get depositor address from contract storage (need to query event or direct read)
-      // For now, we'll just check if wallet is owner
-      // Authorization will be handled by smart contract itself
-
-      // Also check pre-execution conditions
-      console.log("[Verify Owner] Getting lottery stats...");
       const [totalParticipants, , , , lotteryDeadline, isActive, isExecuted] = 
         await contract.getLotteryStats();
 
@@ -460,13 +439,10 @@ export async function registerRoutes(
       const deadlinePassed = currentTime > Number(lotteryDeadline);
       const hasParticipants = Number(totalParticipants) > 0;
 
-      // Check execution conditions (contract will verify owner/depositor authorization)
       const executionErrors = [];
       if (isExecuted) executionErrors.push("Lottery already executed");
       if (!deadlinePassed) executionErrors.push(`Deadline not passed (${Number(lotteryDeadline) - currentTime}s remaining)`);
       if (!hasParticipants) executionErrors.push("No participants registered");
-
-      console.log("[Verify Owner] Results:", { isOwner, deadlinePassed, hasParticipants, isExecuted });
 
       return res.json({
         walletAddress,
@@ -483,7 +459,6 @@ export async function registerRoutes(
     } catch (error) {
       console.error("[Verify Owner] Error:", error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error("[Verify Owner] Error details:", errorMsg);
       return res.status(500).json({
         error: "Failed to verify authorization",
         details: errorMsg
@@ -492,13 +467,11 @@ export async function registerRoutes(
   });
 
   // ============================================
-  // GET LOTTERY STATS (from Smart Contract - deadline MUST come from contract)
+  // GET LOTTERY STATS
   // ============================================
   app.get("/api/lottery-stats", async (req, res) => {
     try {
-      // Must fetch from blockchain if contract is configured
       if (!CONFIG.CONTRACT_ADDRESS) {
-        console.warn("[Lottery Stats] No contract address configured - cannot fetch deadline from blockchain");
         return res.status(400).json({ 
           success: false, 
           message: "Contract not deployed yet. Please deploy and set CONTRACT_ADDRESS." 
@@ -507,7 +480,6 @@ export async function registerRoutes(
 
       try {
         const blockchainStats = await getLotteryStatsFromBlockchain();
-        console.log("[Lottery Stats] Using blockchain data with deadline:", new Date(blockchainStats.deadline * 1000).toISOString());
         return res.json(blockchainStats);
       } catch (error) {
         console.error("[Lottery Stats] Failed to fetch from blockchain:", error);
@@ -527,7 +499,7 @@ export async function registerRoutes(
   });
 
   // ============================================
-  // GET PRIZE TIERS (from Smart Contract)
+  // GET PRIZE TIERS
   // ============================================
   app.get("/api/prize-tiers", async (req, res) => {
     try {
@@ -547,7 +519,6 @@ export async function registerRoutes(
 
       const tiers = await contract.getAllPrizeTiers();
 
-      // Convert tiers to USD for display
       const tiersWithUsd = await Promise.all(
         tiers.map(async (tier: any) => {
           const prizeInUsd = await weiToUsd(tier.prizePerWinner);
@@ -576,245 +547,11 @@ export async function registerRoutes(
   });
 
   // ============================================
-  // DEMO: Set sample winners for testing
-  // ============================================
-  app.post("/api/demo/set-winners", async (req, res) => {
-    try {
-      const { winners } = req.body;
-
-      if (!winners || !Array.isArray(winners)) {
-        return res.status(400).json({
-          error: "Invalid request. Expected: { winners: ['0x...', '0x...'] }"
-        });
-      }
-
-      // Set winners in storage
-      await storage.setWinners(winners);
-
-      return res.json({
-        success: true,
-        message: "Demo winners set successfully",
-        winnersCount: winners.length,
-        winners: winners,
-      });
-    } catch (error) {
-      console.error("[Demo] Set winners error:", error);
-      return res.status(500).json({
-        error: "Failed to set winners",
-        details: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  // ============================================
-  // DEMO: Reset state for fresh testing
-  // ============================================
-  app.post("/api/demo/reset", async (req, res) => {
-    try {
-      // Create fresh storage (clears all data)
-      const newStorage = new (require("./storage").MemStorage)();
-
-      return res.json({
-        success: true,
-        message: "Demo state reset successfully - all data cleared",
-      });
-    } catch (error) {
-      console.error("[Demo] Reset error:", error);
-      return res.status(500).json({
-        error: "Failed to reset state",
-        details: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  // ============================================
-  // DEMO: Set sample participants and winners for testing
-  // ============================================
-  app.post("/api/demo/populate-test-data", async (req, res) => {
-    try {
-      const participantCount = req.body.participantCount || 10;
-      const winnersCount = req.body.winnersCount || 3;
-
-      // Generate sample participants
-      const participants: string[] = [];
-      for (let i = 0; i < participantCount; i++) {
-        const address = `0x${Math.random().toString(16).slice(2).padStart(40, '0')}`;
-        participants.push(address);
-        await storage.addParticipant(address);
-      }
-
-      // Select random winners
-      const winners = participants.slice(0, winnersCount);
-      await storage.setWinners(winners);
-
-      return res.json({
-        success: true,
-        message: "Test data populated successfully",
-        participantsCount: participantCount,
-        winnersCount: winnersCount,
-        winners: winners,
-      });
-    } catch (error) {
-      console.error("[Demo] Populate test data error:", error);
-      return res.status(500).json({
-        error: "Failed to populate test data",
-        details: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  // ============================================
-  // DEBUG: Simple owner check endpoint
-  // ============================================
-  app.get("/api/debug/owner", async (req, res) => {
-    try {
-      if (!CONFIG.CONTRACT_ADDRESS) {
-        return res.status(400).json({
-          error: "Contract address not configured",
-        });
-      }
-
-      const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
-      const contract = new ethers.Contract(
-        CONFIG.CONTRACT_ADDRESS,
-        EXTENDED_ABI,
-        provider
-      );
-
-      console.log("[Debug Owner] Attempting to read owner from contract...");
-      const owner = await contract.owner();
-      console.log("[Debug Owner] Successfully read owner:", owner);
-
-      return res.json({
-        contractAddress: CONFIG.CONTRACT_ADDRESS,
-        owner,
-        rpcUrl: CONFIG.RPC_URL,
-      });
-    } catch (error) {
-      console.error("[Debug] Owner fetch error:", error);
-      return res.status(500).json({
-        error: "Failed to fetch owner",
-        details: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  // ============================================
-  // DEBUG: Check contract state directly
-  // ============================================
-  app.get("/api/debug/contract-state", async (req, res) => {
-    try {
-      if (!CONFIG.CONTRACT_ADDRESS) {
-        return res.status(400).json({
-          error: "Contract address not configured",
-        });
-      }
-
-      const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
-      const contract = new ethers.Contract(
-        CONFIG.CONTRACT_ADDRESS,
-        SOCIALQUEST_CONTRACT_ABI,
-        provider
-      );
-
-      const [
-        totalParticipants,
-        currentWinnersCount,
-        currentPrizePerWinner,
-        currentTotalPrize,
-        lotteryDeadline,
-        active,
-        executed,
-      ] = await contract.getLotteryStats();
-
-      let winners: string[] = [];
-      try {
-        winners = await contract.getWinners();
-      } catch (e) {
-        console.warn("Could not fetch winners:", e);
-      }
-
-      return res.json({
-        contractAddress: CONFIG.CONTRACT_ADDRESS,
-        rpcUrl: CONFIG.RPC_URL,
-        totalParticipants: Number(totalParticipants),
-        currentWinnersCount: Number(currentWinnersCount),
-        currentPrizePerWinner: ethers.formatEther(currentPrizePerWinner),
-        lotteryDeadline: Number(lotteryDeadline),
-        deadlineDate: new Date(Number(lotteryDeadline) * 1000).toISOString(),
-        isActive: active,
-        isExecuted: executed,
-        winnersCount: winners.length,
-        winners: winners,
-        blockchainStatus: executed ? "EXECUTED" : (active ? "ACTIVE" : "INACTIVE"),
-      });
-    } catch (error) {
-      console.error("[Debug] Contract state error:", error);
-      return res.status(500).json({
-        error: "Failed to fetch contract state",
-        details: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  // ============================================
-  // ADMIN: GET PARTICIPANTS (from Smart Contract or fallback to storage)
-  // ============================================
-  app.get("/api/admin/participants", async (req, res) => {
-    try {
-      // Try to fetch from blockchain first if contract address is set
-      if (CONFIG.CONTRACT_ADDRESS) {
-        try {
-          const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
-          const contract = new ethers.Contract(
-            CONFIG.CONTRACT_ADDRESS,
-            SOCIALQUEST_CONTRACT_ABI,
-            provider
-          );
-
-          const participantAddresses = await contract.getParticipants();
-
-          // Get winners for isWinner flag
-          let winners: string[] = [];
-          try {
-            winners = await contract.getWinners();
-          } catch {
-            // If getWinners fails, just use empty array
-          }
-
-          const winnersSet = new Set(winners.map((w: string) => w.toLowerCase()));
-
-          // Map addresses to participant objects
-          const participants = participantAddresses.map((address: string) => ({
-            address: address.toLowerCase(),
-            mintedAt: Math.floor(Date.now() / 1000), // Fallback timestamp
-            isWinner: winnersSet.has(address.toLowerCase()),
-          }));
-
-          return res.json(participants);
-        } catch (error) {
-          console.warn("Failed to fetch participants from blockchain, falling back to local storage:", error);
-        }
-      }
-
-      // Fallback to local storage
-      const participants = await storage.getParticipants();
-      return res.json(participants);
-    } catch (error) {
-      console.error("Error getting participants:", error);
-      return res.status(500).json({ 
-        success: false, 
-        message: "Internal server error" 
-      });
-    }
-  });
-
-  // ============================================
-  // WEBHOOK: Notify when mint is confirmed (called by frontend after successful tx)
+  // WEBHOOK: MINT CONFIRMED
   // ============================================
   app.post("/api/mint-confirmed", async (req, res) => {
     try {
-      const { fid, walletAddress, txHash } = req.body;
+      const { fid, walletAddress } = req.body;
 
       if (!fid || !walletAddress) {
         return res.status(400).json({ 
@@ -823,7 +560,6 @@ export async function registerRoutes(
         });
       }
 
-      // This is the correct place to mark the user as permanently Minted.
       await storage.markUserMinted(fid, walletAddress);
 
       return res.json({ 
@@ -843,7 +579,7 @@ export async function registerRoutes(
 }
 
 // ============================================
-// BLOCKCHAIN FUNCTIONS - Read Lottery Stats from Smart Contract
+// BLOCKCHAIN FUNCTIONS
 // ============================================
 
 // Chainlink price feed ABI for reading ETH/USD price
@@ -863,24 +599,31 @@ const CHAINLINK_FEED_ABI = [
   },
 ] as const;
 
-// Get ETH/USD price from Chainlink and convert wei to USD
 async function weiToUsd(weiAmount: bigint): Promise<number> {
+  const FALLBACK_ETH_PRICE = 3100;
+
   try {
+    // 💡 IMPORTANT: To avoid Rate Limit issues with public RPCs when Oracle fails,
+    // we are temporarily bypassing the Oracle call and using a fixed price.
+    // Uncomment the block below to restore Oracle functionality if you have a premium RPC.
+
+    /*
     const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
     const priceFeedAddress = "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70"; // Base Mainnet ETH/USD
     const priceFeed = new ethers.Contract(priceFeedAddress, CHAINLINK_FEED_ABI, provider);
-
     const [, answer] = await priceFeed.latestRoundData();
-    // answer is in 8 decimals (e.g., 2500 * 10^8 for $2500)
     const ethPriceInUsd = Number(answer) / 10**8;
-
-    // Convert wei to ETH then to USD
     const ethAmount = parseFloat(ethers.formatEther(weiAmount));
     return ethAmount * ethPriceInUsd;
+    */
+
+    // USING FALLBACK DIRECTLY FOR STABILITY
+    console.log("[weiToUsd] Using fallback price logic to prevent Rate Limit");
+    return parseFloat(ethers.formatEther(weiAmount)) * FALLBACK_ETH_PRICE;
+
   } catch (error) {
-    console.warn("[weiToUsd] Error converting wei to USD:", error);
-    // Fallback: assume $2500/ETH
-    return parseFloat(ethers.formatEther(weiAmount)) * 2500;
+    console.warn("[weiToUsd] Error (using fallback):", error);
+    return parseFloat(ethers.formatEther(weiAmount)) * FALLBACK_ETH_PRICE;
   }
 }
 
@@ -897,9 +640,6 @@ async function getLotteryStatsFromBlockchain() {
       provider
     );
 
-    console.log("[Blockchain] Fetching lottery stats from contract:", CONFIG.CONTRACT_ADDRESS);
-
-    // Call getLotteryStats
     const [
       totalParticipants,
       currentWinnersCount,
@@ -910,18 +650,13 @@ async function getLotteryStatsFromBlockchain() {
       executed,
     ] = await contract.getLotteryStats();
 
-    // Always try to get winners (even if not executed yet)
     let winners: string[] | undefined;
     try {
       winners = await contract.getWinners();
-      if (winners && winners.length > 0) {
-        console.log("[Blockchain] Winners count:", winners.length);
-      }
     } catch (e) {
       console.warn("[Blockchain] Could not fetch winners:", e);
     }
 
-    // Convert wei amounts to USD
     const prizePerWinnerUsd = await weiToUsd(currentPrizePerWinner);
     const totalPrizeUsd = await weiToUsd(currentTotalPrize);
 
@@ -929,8 +664,8 @@ async function getLotteryStatsFromBlockchain() {
       minParticipants: 0,
       maxParticipants: undefined,
       winnersCount: Number(currentWinnersCount),
-      prizePerWinner: Math.round(prizePerWinnerUsd * 100) / 100, // Round to 2 decimals
-      totalPrize: Math.round(totalPrizeUsd * 100) / 100, // Round to 2 decimals
+      prizePerWinner: Math.round(prizePerWinnerUsd * 100) / 100, 
+      totalPrize: Math.round(totalPrizeUsd * 100) / 100, 
     };
 
     const stats = {
@@ -942,14 +677,6 @@ async function getLotteryStatsFromBlockchain() {
       winners: winners && winners.length > 0 ? winners : undefined,
     };
 
-    console.log("[Blockchain] Stats retrieved successfully:", {
-      participants: stats.totalParticipants,
-      prizePerWinner: `$${currentTier.prizePerWinner} USD`,
-      totalPrize: `$${currentTier.totalPrize} USD`,
-      deadline: new Date(stats.deadline * 1000).toISOString(),
-      winners: winners?.length || 0,
-    });
-
     return stats;
   } catch (error) {
     console.error("[Blockchain] Error fetching stats:", error);
@@ -958,20 +685,18 @@ async function getLotteryStatsFromBlockchain() {
 }
 
 // ============================================
-// NEYNAR API VERIFICATION FUNCTIONS (Improved Error Handling)
+// NEYNAR API VERIFICATION FUNCTIONS
 // ============================================
 
 async function verifyLike(fid: number, castHash: string): Promise<boolean> {
-  if (!CONFIG.NEYNAR_API_KEY) {
-    console.warn("[verifyLike] NEYNAR_API_KEY is not set. Allowing verification for testing.");
-    return true; // Test mode: always pass
-  }
-  if (!castHash) {
-    throw new Error("Missing configuration: CAST_HASH is required for Like verification.");
-  }
-
   try {
     console.log(`[verifyLike] Checking FID ${fid} for cast ${castHash}`);
+    console.log(`[verifyLike] Using API Key: ${CONFIG.NEYNAR_API_KEY ? 'YES' : 'NO'}`);
+
+    if (!CONFIG.NEYNAR_API_KEY) {
+      console.warn("[verifyLike] NEYNAR_API_KEY not set. Test mode active.");
+      return true;
+    }
 
     const url = `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash&viewer_fid=${fid}`;
 
@@ -982,13 +707,12 @@ async function verifyLike(fid: number, castHash: string): Promise<boolean> {
     });
 
     if (!response.ok) {
-        console.error(`[verifyLike] Neynar API error: ${response.status} ${response.statusText}`);
+        console.error(`[verifyLike] Neynar API error: ${response.status}`);
         return false;
     }
 
     const data = await response.json();
-    // Check if the current FID is in the likes list
-    return data.cast.reactions.likes.some((like: { fid: number }) => like.fid === fid);
+    return data.cast.viewer_context?.liked === true;
 
   } catch (error) {
     console.error("[verifyLike] Fetch error:", error);
@@ -997,16 +721,13 @@ async function verifyLike(fid: number, castHash: string): Promise<boolean> {
 }
 
 async function verifyRecast(fid: number, castHash: string): Promise<boolean> {
-  if (!CONFIG.NEYNAR_API_KEY) {
-    console.warn("[verifyRecast] NEYNAR_API_KEY is not set. Allowing verification for testing.");
-    return true; // Test mode: always pass
-  }
-  if (!castHash) {
-    throw new Error("Missing configuration: CAST_HASH is required for Recast verification.");
-  }
-
   try {
     console.log(`[verifyRecast] Checking FID ${fid} for recast of ${castHash}`);
+
+    if (!CONFIG.NEYNAR_API_KEY) {
+      console.warn("[verifyRecast] NEYNAR_API_KEY not set. Test mode active.");
+      return true;
+    }
 
     const url = `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash&viewer_fid=${fid}`;
 
@@ -1017,13 +738,12 @@ async function verifyRecast(fid: number, castHash: string): Promise<boolean> {
     });
 
     if (!response.ok) {
-        console.error(`[verifyRecast] Neynar API error: ${response.status} ${response.statusText}`);
+        console.error(`[verifyRecast] Neynar API error: ${response.status}`);
         return false;
     }
 
     const data = await response.json();
-    // Check if the current FID is in the recasters list
-    return data.cast.reactions.recasts.some((recast: { fid: number }) => recast.fid === fid);
+    return data.cast.viewer_context?.recasted === true;
 
   } catch (error) {
     console.error("[verifyRecast] Fetch error:", error);
@@ -1032,32 +752,32 @@ async function verifyRecast(fid: number, castHash: string): Promise<boolean> {
 }
 
 async function verifyFollow(fid: number, targetFid: number): Promise<boolean> {
-  if (!CONFIG.NEYNAR_API_KEY) {
-    console.warn("[verifyFollow] NEYNAR_API_KEY is not set. Allowing verification for testing.");
-    return true; // Test mode: always pass
-  }
-  if (!targetFid || targetFid === 0) {
-    throw new Error("Missing configuration: TARGET_FID is required for Follow verification.");
-  }
-
   try {
     console.log(`[verifyFollow] Checking if FID ${fid} follows target ${targetFid}`);
 
-    // Neynar API endpoint for checking follow status
-    const url = `${NEYNAR_API_URL}/user/following?fid=${fid}&target_fid=${targetFid}`;
+    if (!CONFIG.NEYNAR_API_KEY) {
+      console.warn("[verifyFollow] NEYNAR_API_KEY not set. Test mode active.");
+      return true;
+    }
+
+    if (!targetFid || targetFid === 0) {
+      console.error("[verifyFollow] Target FID is 0 or missing.");
+      return false;
+    }
+
+    const url = `${NEYNAR_API_URL}/user/bulk?fids=${targetFid}&viewer_fid=${fid}`;
 
     const response = await fetch(url, {
         headers: { "api_key": CONFIG.NEYNAR_API_KEY },
     });
 
     if (!response.ok) {
-        console.error(`[verifyFollow] Neynar API error: ${response.status} ${response.statusText}`);
+        console.error(`[verifyFollow] Neynar API error: ${response.status}`);
         return false;
     }
 
     const data = await response.json();
-    // The API returns { is_following: true/false }
-    return data.is_following === true; 
+    return data.users[0]?.viewer_context?.following === true; 
 
   } catch (error) {
     console.error("[verifyFollow] Fetch error:", error);
@@ -1070,27 +790,15 @@ async function generateMintSignature(
     nonce: string,
     contractAddress: string
 ): Promise<string> {
-    const signer = new ethers.Wallet(CONFIG.SIGNER_PRIVATE_KEY);
+    const wallet = new ethers.Wallet(CONFIG.SIGNER_PRIVATE_KEY);
 
-    const domain = {
-        name: "SocialQuest",
-        version: "1",
-        chainId: CONFIG.CHAIN_ID,
-        verifyingContract: contractAddress,
-    };
+    // Matches keccak256(abi.encodePacked(msg.sender, nonce, address(this))) in Solidity
+    const messageHash = ethers.solidityPackedKeccak256(
+      ["address", "uint256", "address"],
+      [walletAddress, nonce, contractAddress]
+    );
 
-    const types = {
-        MintRequest: [
-            { name: "to", type: "address" },
-            { name: "nonce", type: "uint256" },
-        ],
-    };
-
-    const value = {
-        to: walletAddress,
-        nonce: BigInt(nonce), // Ensure nonce is handled as BigInt for Ethers v6
-    };
-
-    const signature = await signer.signTypedData(domain, types, value);
+    // Ethers v6 wallet.signMessage automatically adds the Ethereum prefix
+    const signature = await wallet.signMessage(ethers.getBytes(messageHash));
     return signature;
 }
