@@ -283,10 +283,20 @@ export async function registerRoutes(
           message = verified ? "Follow verified!" : "Not following yet. Please follow the account first.";
         }
       } catch (error) {
+        // This catch block handles thrown configuration errors (e.g., missing CAST_HASH)
         console.error(`Error verifying ${taskType}:`, error);
+
+        // If it's a known configuration error, send a specific message
+        if (error instanceof Error && error.message.includes("Missing configuration")) {
+            return res.status(500).json({
+                success: false,
+                message: `Server Error: ${error.message}`
+            });
+        }
+
         return res.status(500).json({ 
           success: false, 
-          message: "Failed to verify task. Please try again." 
+          message: "Failed to verify task due to an unexpected server error. Please try again." 
         });
       }
 
@@ -948,17 +958,20 @@ async function getLotteryStatsFromBlockchain() {
 }
 
 // ============================================
-// NEYNAR API VERIFICATION FUNCTIONS
+// NEYNAR API VERIFICATION FUNCTIONS (Improved Error Handling)
 // ============================================
 
 async function verifyLike(fid: number, castHash: string): Promise<boolean> {
+  if (!CONFIG.NEYNAR_API_KEY) {
+    console.warn("[verifyLike] NEYNAR_API_KEY is not set. Allowing verification for testing.");
+    return true; // Test mode: always pass
+  }
+  if (!castHash) {
+    throw new Error("Missing configuration: CAST_HASH is required for Like verification.");
+  }
+
   try {
     console.log(`[verifyLike] Checking FID ${fid} for cast ${castHash}`);
-
-    if (!CONFIG.NEYNAR_API_KEY) {
-      console.warn("[verifyLike] NEYNAR_API_KEY is not set. Allowing verification for testing.");
-      return true;
-    }
 
     const url = `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash&viewer_fid=${fid}`;
 
@@ -974,6 +987,7 @@ async function verifyLike(fid: number, castHash: string): Promise<boolean> {
     }
 
     const data = await response.json();
+    // Check if the current FID is in the likes list
     return data.cast.reactions.likes.some((like: { fid: number }) => like.fid === fid);
 
   } catch (error) {
@@ -983,13 +997,16 @@ async function verifyLike(fid: number, castHash: string): Promise<boolean> {
 }
 
 async function verifyRecast(fid: number, castHash: string): Promise<boolean> {
+  if (!CONFIG.NEYNAR_API_KEY) {
+    console.warn("[verifyRecast] NEYNAR_API_KEY is not set. Allowing verification for testing.");
+    return true; // Test mode: always pass
+  }
+  if (!castHash) {
+    throw new Error("Missing configuration: CAST_HASH is required for Recast verification.");
+  }
+
   try {
     console.log(`[verifyRecast] Checking FID ${fid} for recast of ${castHash}`);
-
-    if (!CONFIG.NEYNAR_API_KEY) {
-      console.warn("[verifyRecast] NEYNAR_API_KEY is not set. Allowing verification for testing.");
-      return true;
-    }
 
     const url = `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash&viewer_fid=${fid}`;
 
@@ -1015,18 +1032,16 @@ async function verifyRecast(fid: number, castHash: string): Promise<boolean> {
 }
 
 async function verifyFollow(fid: number, targetFid: number): Promise<boolean> {
+  if (!CONFIG.NEYNAR_API_KEY) {
+    console.warn("[verifyFollow] NEYNAR_API_KEY is not set. Allowing verification for testing.");
+    return true; // Test mode: always pass
+  }
+  if (!targetFid || targetFid === 0) {
+    throw new Error("Missing configuration: TARGET_FID is required for Follow verification.");
+  }
+
   try {
     console.log(`[verifyFollow] Checking if FID ${fid} follows target ${targetFid}`);
-
-    if (!CONFIG.NEYNAR_API_KEY) {
-      console.warn("[verifyFollow] NEYNAR_API_KEY is not set. Allowing verification for testing.");
-      return true;
-    }
-
-    if (!targetFid || targetFid === 0) {
-      console.error("[verifyFollow] Target FID is 0 or missing.");
-      return false;
-    }
 
     // Neynar API endpoint for checking follow status
     const url = `${NEYNAR_API_URL}/user/following?fid=${fid}&target_fid=${targetFid}`;
