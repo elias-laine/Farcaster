@@ -283,20 +283,10 @@ export async function registerRoutes(
           message = verified ? "Follow verified!" : "Not following yet. Please follow the account first.";
         }
       } catch (error) {
-        // This catch block handles thrown configuration errors (e.g., missing CAST_HASH)
         console.error(`Error verifying ${taskType}:`, error);
-
-        // If it's a known configuration error, send a specific message
-        if (error instanceof Error && error.message.includes("Missing configuration")) {
-            return res.status(500).json({
-                success: false,
-                message: `Server Error: ${error.message}`
-            });
-        }
-
         return res.status(500).json({ 
           success: false, 
-          message: "Failed to verify task due to an unexpected server error. Please try again." 
+          message: "Failed to verify task. Please try again." 
         });
       }
 
@@ -380,7 +370,15 @@ export async function registerRoutes(
         });
       }
 
-      // Check if already minted (This is the final block)
+      // Check if signature was already issued
+      if (progress.signatureIssued) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "A mint signature has already been issued for this account." 
+        });
+      }
+
+      // Check if already minted
       if (progress.mintedAt) {
         return res.status(400).json({ 
           success: false, 
@@ -398,13 +396,14 @@ export async function registerRoutes(
         CONFIG.CONTRACT_ADDRESS
       );
 
-      // We no longer mark the signature as issued here. The user can retry.
+      // Mark signature as issued
+      await storage.markSignatureIssued(progress.fid, walletAddress);
 
       return res.json({ 
         success: true, 
         signature,
         nonce,
-        message: "Signature generated successfully (ready for transaction)" 
+        message: "Signature generated successfully" 
       });
     } catch (error) {
       console.error("Error generating mint signature:", error);
@@ -823,7 +822,6 @@ export async function registerRoutes(
         });
       }
 
-      // This is the correct place to mark the user as permanently Minted.
       await storage.markUserMinted(fid, walletAddress);
 
       return res.json({ 
@@ -879,7 +877,7 @@ async function weiToUsd(weiAmount: bigint): Promise<number> {
     return ethAmount * ethPriceInUsd;
   } catch (error) {
     console.warn("[weiToUsd] Error converting wei to USD:", error);
-    // Fallback: assume $2500/ETH
+    // Fallback: assume $5 USD = 0.002 ETH (at $2500/ETH)
     return parseFloat(ethers.formatEther(weiAmount)) * 2500;
   }
 }
@@ -958,22 +956,23 @@ async function getLotteryStatsFromBlockchain() {
 }
 
 // ============================================
-// NEYNAR API VERIFICATION FUNCTIONS (Improved Error Handling)
+// NEYNAR API VERIFICATION FUNCTIONS
 // ============================================
 
 async function verifyLike(fid: number, castHash: string): Promise<boolean> {
-  if (!CONFIG.NEYNAR_API_KEY) {
-    console.warn("[verifyLike] NEYNAR_API_KEY is not set. Allowing verification for testing.");
-    return true; // Test mode: always pass
-  }
-  if (!castHash) {
-    throw new Error("Missing configuration: CAST_HASH is required for Like verification.");
-  }
-
   try {
     console.log(`[verifyLike] Checking FID ${fid} for cast ${castHash}`);
+    console.log(`[verifyLike] Using API Key: ${CONFIG.NEYNAR_API_KEY ? 'YES' : 'NO'}`);
+
+    if (!CONFIG.NEYNAR_API_KEY) {
+      console.error("[verifyLike] ERROR: NEYNAR_API_KEY is not set!");
+      // For testing: allow verification if API key is missing
+      console.log("[verifyLike] TEST MODE: Allowing verification without API key");
+      return true;
+    }
 
     const url = `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash&viewer_fid=${fid}`;
+    console.log(`[verifyLike] Fetching from: ${url}`);
 
     const response = await fetch(url, {
       headers: {
@@ -981,116 +980,121 @@ async function verifyLike(fid: number, castHash: string): Promise<boolean> {
       },
     });
 
+    console.log(`[verifyLike] Response status: ${response.status}`);
+
     if (!response.ok) {
-        console.error(`[verifyLike] Neynar API error: ${response.status} ${response.statusText}`);
-        return false;
+      const errorText = await response.text();
+      console.error("[verifyLike] Neynar API error:", response.status, errorText);
+      return false;
     }
 
     const data = await response.json();
-    // Check if the current FID is in the likes list
-    return data.cast.reactions.likes.some((like: { fid: number }) => like.fid === fid);
+    console.log("[verifyLike] API Response:", JSON.stringify(data, null, 2));
 
+    // Check viewer_context.liked - this indicates if the current viewer liked the cast
+    const hasLiked = data.cast?.viewer_context?.liked === true;
+    console.log(`[verifyLike] FID ${fid} has liked: ${hasLiked}`);
+
+    return hasLiked;
   } catch (error) {
-    console.error("[verifyLike] Fetch error:", error);
+    console.error("Error verifying like:", error);
     return false;
   }
 }
 
 async function verifyRecast(fid: number, castHash: string): Promise<boolean> {
-  if (!CONFIG.NEYNAR_API_KEY) {
-    console.warn("[verifyRecast] NEYNAR_API_KEY is not set. Allowing verification for testing.");
-    return true; // Test mode: always pass
-  }
-  if (!castHash) {
-    throw new Error("Missing configuration: CAST_HASH is required for Recast verification.");
-  }
-
   try {
-    console.log(`[verifyRecast] Checking FID ${fid} for recast of ${castHash}`);
+    console.log(`[verifyRecast] Checking FID ${fid} for cast ${castHash}`);
 
-    const url = `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash&viewer_fid=${fid}`;
+    if (!CONFIG.NEYNAR_API_KEY) {
+      console.log("[verifyRecast] TEST MODE: Allowing verification without API key");
+      return true;
+    }
 
-    const response = await fetch(url, {
-      headers: {
-        "api_key": CONFIG.NEYNAR_API_KEY,
-      },
-    });
+    const response = await fetch(
+      `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash&viewer_fid=${fid}`,
+      {
+        headers: {
+          "api_key": CONFIG.NEYNAR_API_KEY,
+        },
+      }
+    );
 
     if (!response.ok) {
-        console.error(`[verifyRecast] Neynar API error: ${response.status} ${response.statusText}`);
-        return false;
+      console.error("Neynar API error:", await response.text());
+      return false;
     }
 
     const data = await response.json();
-    // Check if the current FID is in the recasters list
-    return data.cast.reactions.recasts.some((recast: { fid: number }) => recast.fid === fid);
 
+    // Check viewer_context.recasted - this indicates if the current viewer recasted the cast
+    const hasRecasted = data.cast?.viewer_context?.recasted === true;
+    console.log(`[verifyRecast] FID ${fid} has recasted: ${hasRecasted}`);
+
+    return hasRecasted;
   } catch (error) {
-    console.error("[verifyRecast] Fetch error:", error);
+    console.error("Error verifying recast:", error);
     return false;
   }
 }
 
 async function verifyFollow(fid: number, targetFid: number): Promise<boolean> {
-  if (!CONFIG.NEYNAR_API_KEY) {
-    console.warn("[verifyFollow] NEYNAR_API_KEY is not set. Allowing verification for testing.");
-    return true; // Test mode: always pass
-  }
-  if (!targetFid || targetFid === 0) {
-    throw new Error("Missing configuration: TARGET_FID is required for Follow verification.");
-  }
-
   try {
-    console.log(`[verifyFollow] Checking if FID ${fid} follows target ${targetFid}`);
+    console.log(`[verifyFollow] Checking if FID ${fid} follows target FID ${targetFid}`);
 
-    // Neynar API endpoint for checking follow status
-    const url = `${NEYNAR_API_URL}/user/following?fid=${fid}&target_fid=${targetFid}`;
+    if (!CONFIG.NEYNAR_API_KEY) {
+      console.log("[verifyFollow] TEST MODE: Allowing verification without API key");
+      return true;
+    }
 
-    const response = await fetch(url, {
-        headers: { "api_key": CONFIG.NEYNAR_API_KEY },
-    });
+    const response = await fetch(
+      `${NEYNAR_API_URL}/user/bulk?fids=${targetFid}&viewer_fid=${fid}`,
+      {
+        headers: {
+          "api_key": CONFIG.NEYNAR_API_KEY,
+        },
+      }
+    );
 
     if (!response.ok) {
-        console.error(`[verifyFollow] Neynar API error: ${response.status} ${response.statusText}`);
-        return false;
+      console.error("Neynar API error:", await response.text());
+      return false;
     }
 
     const data = await response.json();
-    // The API returns { is_following: true/false }
-    return data.is_following === true; 
+    const user = data.users?.[0];
+    console.log("[verifyFollow] User data:", user?.viewer_context);
 
+    // Check if the viewer (fid) is following the target user
+    const isFollowing = user?.viewer_context?.following === true;
+    console.log(`[verifyFollow] FID ${fid} follows target: ${isFollowing}`);
+
+    return isFollowing;
   } catch (error) {
-    console.error("[verifyFollow] Fetch error:", error);
+    console.error("Error verifying follow:", error);
     return false;
   }
 }
 
+// ============================================
+// SIGNATURE GENERATION
+// ============================================
+
 async function generateMintSignature(
-    walletAddress: string,
-    nonce: string,
-    contractAddress: string
+  walletAddress: string,
+  nonce: number,
+  contractAddress: string
 ): Promise<string> {
-    const signer = new ethers.Wallet(CONFIG.SIGNER_PRIVATE_KEY);
+  const wallet = new ethers.Wallet(CONFIG.SIGNER_PRIVATE_KEY);
 
-    const domain = {
-        name: "SocialQuest",
-        version: "1",
-        chainId: CONFIG.CHAIN_ID,
-        verifyingContract: contractAddress,
-    };
+  // Create message hash matching the contract's verification
+  const messageHash = ethers.solidityPackedKeccak256(
+    ["address", "uint256", "address"],
+    [walletAddress, nonce, contractAddress]
+  );
 
-    const types = {
-        MintRequest: [
-            { name: "to", type: "address" },
-            { name: "nonce", type: "uint256" },
-        ],
-    };
+  // Sign the message
+  const signature = await wallet.signMessage(ethers.getBytes(messageHash));
 
-    const value = {
-        to: walletAddress,
-        nonce: BigInt(nonce), // Ensure nonce is handled as BigInt for Ethers v6
-    };
-
-    const signature = await signer.signTypedData(domain, types, value);
-    return signature;
+  return signature;
 }
