@@ -370,14 +370,7 @@ export async function registerRoutes(
         });
       }
 
-      // ----------------------------------------------------------------------
-      // FIX: Removed the check for `progress.signatureIssued` and the call to 
-      // `storage.markSignatureIssued()`. The user can now request a new signature
-      // if the previous transaction was cancelled or failed.
-      // The only final block is whether the user has successfully minted.
-      // ----------------------------------------------------------------------
-
-      // Check if already minted
+      // Check if already minted (This is the final block)
       if (progress.mintedAt) {
         return res.status(400).json({ 
           success: false, 
@@ -395,8 +388,7 @@ export async function registerRoutes(
         CONFIG.CONTRACT_ADDRESS
       );
 
-      // NO LONGER MARK SIGNATURE AS ISSUED HERE
-      // The status will be marked as 'minted' only after successful transaction confirmation.
+      // We no longer mark the signature as issued here. The user can retry.
 
       return res.json({ 
         success: true, 
@@ -962,25 +954,19 @@ async function getLotteryStatsFromBlockchain() {
 async function verifyLike(fid: number, castHash: string): Promise<boolean> {
   try {
     console.log(`[verifyLike] Checking FID ${fid} for cast ${castHash}`);
-    console.log(`[verifyLike] Using API Key: ${CONFIG.NEYNAR_API_KEY ? 'YES' : 'NO'}`);
 
     if (!CONFIG.NEYNAR_API_KEY) {
-      console.error("[verifyLike] ERROR: NEYNAR_API_KEY is not set!");
-      // For testing: allow verification if API key is missing
-      console.log("[verifyLike] TEST MODE: Allowing verification without API key");
+      console.warn("[verifyLike] NEYNAR_API_KEY is not set. Allowing verification for testing.");
       return true;
     }
 
     const url = `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash&viewer_fid=${fid}`;
-    console.log(`[verifyLike] Fetching from: ${url}`);
 
     const response = await fetch(url, {
       headers: {
         "api_key": CONFIG.NEYNAR_API_KEY,
       },
     });
-
-    console.log(`[verifyLike] Response status: ${response.status}`);
 
     if (!response.ok) {
         console.error(`[verifyLike] Neynar API error: ${response.status} ${response.statusText}`);
@@ -996,18 +982,72 @@ async function verifyLike(fid: number, castHash: string): Promise<boolean> {
   }
 }
 
-// ============================================
-// UTILITY FUNCTIONS (Placeholder for other social verification functions)
-// ============================================
-
 async function verifyRecast(fid: number, castHash: string): Promise<boolean> {
-  // NOTE: This implementation is often similar to verifyLike, checking recasts array
-  return true; // Placeholder for logic
+  try {
+    console.log(`[verifyRecast] Checking FID ${fid} for recast of ${castHash}`);
+
+    if (!CONFIG.NEYNAR_API_KEY) {
+      console.warn("[verifyRecast] NEYNAR_API_KEY is not set. Allowing verification for testing.");
+      return true;
+    }
+
+    const url = `${NEYNAR_API_URL}/cast?identifier=${castHash}&type=hash&viewer_fid=${fid}`;
+
+    const response = await fetch(url, {
+      headers: {
+        "api_key": CONFIG.NEYNAR_API_KEY,
+      },
+    });
+
+    if (!response.ok) {
+        console.error(`[verifyRecast] Neynar API error: ${response.status} ${response.statusText}`);
+        return false;
+    }
+
+    const data = await response.json();
+    // Check if the current FID is in the recasters list
+    return data.cast.reactions.recasts.some((recast: { fid: number }) => recast.fid === fid);
+
+  } catch (error) {
+    console.error("[verifyRecast] Fetch error:", error);
+    return false;
+  }
 }
 
 async function verifyFollow(fid: number, targetFid: number): Promise<boolean> {
-  // NOTE: This involves checking the user's follows against the target FID
-  return true; // Placeholder for logic
+  try {
+    console.log(`[verifyFollow] Checking if FID ${fid} follows target ${targetFid}`);
+
+    if (!CONFIG.NEYNAR_API_KEY) {
+      console.warn("[verifyFollow] NEYNAR_API_KEY is not set. Allowing verification for testing.");
+      return true;
+    }
+
+    if (!targetFid || targetFid === 0) {
+      console.error("[verifyFollow] Target FID is 0 or missing.");
+      return false;
+    }
+
+    // Neynar API endpoint for checking follow status
+    const url = `${NEYNAR_API_URL}/user/following?fid=${fid}&target_fid=${targetFid}`;
+
+    const response = await fetch(url, {
+        headers: { "api_key": CONFIG.NEYNAR_API_KEY },
+    });
+
+    if (!response.ok) {
+        console.error(`[verifyFollow] Neynar API error: ${response.status} ${response.statusText}`);
+        return false;
+    }
+
+    const data = await response.json();
+    // The API returns { is_following: true/false }
+    return data.is_following === true; 
+
+  } catch (error) {
+    console.error("[verifyFollow] Fetch error:", error);
+    return false;
+  }
 }
 
 async function generateMintSignature(
