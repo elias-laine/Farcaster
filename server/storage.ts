@@ -2,6 +2,15 @@ import type { Task, TaskType, UserProgress, LotteryStats } from "@shared/schema"
 import { getCurrentTier } from "@shared/schema";
 import { randomUUID } from "crypto";
 
+export interface PendingSignature {
+  walletAddress: string;
+  fid: number;
+  signature: string;
+  nonce: number;
+  issuedAt: number;
+  expiresAt: number;
+}
+
 export interface IStorage {
   // User progress
   getUserProgress(fid: number, walletAddress: string): Promise<UserProgress | undefined>;
@@ -20,6 +29,12 @@ export interface IStorage {
   isNonceUsed(nonce: number): Promise<boolean>;
   markNonceUsed(nonce: number): Promise<void>;
   generateNonce(): Promise<number>;
+
+  // Pending signatures (temporary, with TTL)
+  issuePendingSignature(fid: number, walletAddress: string, signature: string, nonce: number): Promise<void>;
+  getPendingSignature(fid: number, walletAddress: string): Promise<PendingSignature | undefined>;
+  confirmSignatureIssued(fid: number, walletAddress: string): Promise<void>;
+  cleanupExpiredSignatures(): Promise<void>;
 }
 
 const TASK_TYPES: TaskType[] = ["like", "recast", "follow"];
@@ -31,6 +46,9 @@ export class MemStorage implements IStorage {
   private winners: string[];
   private nonceCounter: number;
   private walletNonces: Map<string, number>; // Track nonces per wallet to ensure uniqueness
+  private pendingSignatures: Map<string, PendingSignature>; // walletAddress -> PendingSignature
+  private readonly SIGNATURE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.userProgress = new Map();
@@ -39,10 +57,22 @@ export class MemStorage implements IStorage {
     this.winners = [];
     this.nonceCounter = Math.floor(Date.now() / 1000); // Start from current timestamp
     this.walletNonces = new Map();
+    this.pendingSignatures = new Map();
+
+    // Auto cleanup expired signatures every minute
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredSignatures().catch(err => 
+        console.error("[Storage] Error cleaning up expired signatures:", err)
+      );
+    }, 60 * 1000);
   }
 
   private getKey(fid: number, walletAddress: string): string {
     return `${fid}-${walletAddress.toLowerCase()}`;
+  }
+
+  private getPendingSignatureKey(walletAddress: string): string {
+    return walletAddress.toLowerCase();
   }
 
   async getUserProgress(fid: number, walletAddress: string): Promise<UserProgress | undefined> {
@@ -190,6 +220,73 @@ export class MemStorage implements IStorage {
     
     return this.nonceCounter;
   }
-}
+
+  async issuePendingSignature(fid: number, walletAddress: string, signature: string, nonce: number): Promise<void> {
+    const key = this.getPendingSignatureKey(walletAddress);
+    const now = Date.now();
+    
+    const pendingSignature: PendingSignature = {
+      walletAddress: walletAddress.toLowerCase(),
+      fid,
+      signature,
+      nonce,
+      issuedAt: now,
+      expiresAt: now + this.SIGNATURE_TTL,
+    };
+
+    this.pendingSignatures.set(key, pendingSignature);
+    console.log(`[Storage] Issued pending signature for ${walletAddress}, expires in 5 minutes`);
+  }
+
+  async getPendingSignature(fid: number, walletAddress: string): Promise<PendingSignature | undefined> {
+    const key = this.getPendingSignatureKey(walletAddress);
+    const pending = this.pendingSignatures.get(key);
+
+    // Check if pending signature exists and is still valid
+    if (pending) {
+      if (Date.now() > pending.expiresAt) {
+        // Signature has expired
+        this.pendingSignatures.delete(key);
+        console.log(`[Storage] Pending signature expired for ${walletAddress}`);
+        return undefined;
+      }
+      return pending;
+    }
+
+    return undefined;
+  }
+
+  async confirmSignatureIssued(fid: number, walletAddress: string): Promise<void> {
+    const key = this.getPendingSignatureKey(walletAddress);
+    
+    // Remove from pending
+    this.pendingSignatures.delete(key);
+    
+    // Mark as issued in user progress
+    const progressKey = this.getKey(fid, walletAddress);
+    const progress = this.userProgress.get(progressKey);
+    
+    if (progress) {
+      progress.signatureIssued = true;
+      this.userProgress.set(progressKey, progress);
+      console.log(`[Storage] Confirmed signature issued for ${walletAddress}`);
+    }
+  }
+
+  async cleanupExpiredSignatures(): Promise<void> {
+    const now = Date.now();
+    let cleanedCount = 0;
+
+    for (const [key, pending] of this.pendingSignatures.entries()) {
+      if (now > pending.expiresAt) {
+        this.pendingSignatures.delete(key);
+        cleanedCount++;
+      }
+    }
+
+    if (cleanedCount > 0) {
+      console.log(`[Storage] Cleaned up ${cleanedCount} expired signatures`);
+    }
+  }
 
 export const storage = new MemStorage();

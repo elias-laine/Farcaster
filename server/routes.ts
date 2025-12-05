@@ -204,6 +204,51 @@ export async function registerRoutes(
   });
 
   // ============================================
+  // CONFIRM MINT (called after successful transaction)
+  // ============================================
+  app.post("/api/confirm-mint", async (req, res) => {
+    try {
+      const { walletAddress, fid } = req.body;
+
+      if (!walletAddress || !fid) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Missing walletAddress or fid" 
+        });
+      }
+
+      // Get pending signature - verify it exists and hasn't expired
+      const pendingSignature = await storage.getPendingSignature(fid, walletAddress);
+      
+      if (!pendingSignature) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "No valid pending signature found. Please request a new signature." 
+        });
+      }
+
+      // Mark signature as permanently issued (move from pending to issued)
+      await storage.confirmSignatureIssued(fid, walletAddress);
+
+      // Mark user as minted
+      await storage.markUserMinted(fid, walletAddress);
+
+      console.log(`[Confirm Mint] Permanently confirmed mint for ${walletAddress}`);
+
+      return res.json({ 
+        success: true, 
+        message: "Mint confirmed successfully" 
+      });
+    } catch (error) {
+      console.error("Error confirming mint:", error);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Internal server error" 
+      });
+    }
+  });
+
+  // ============================================
   // GET USER PROGRESS
   // ============================================
   app.get("/api/user-progress", async (req, res) => {
@@ -370,7 +415,15 @@ export async function registerRoutes(
         });
       }
 
-      // Check if signature was already issued
+      // Check if already minted
+      if (progress.mintedAt) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "You have already minted your SBT." 
+        });
+      }
+
+      // Check if signature was already permanently issued
       if (progress.signatureIssued) {
         return res.status(400).json({ 
           success: false, 
@@ -378,11 +431,16 @@ export async function registerRoutes(
         });
       }
 
-      // Check if already minted
-      if (progress.mintedAt) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "You have already minted your SBT." 
+      // Check if there's already a valid pending signature (not expired)
+      const existingPending = await storage.getPendingSignature(fid, walletAddress);
+      if (existingPending) {
+        // Return the existing pending signature instead of creating a new one
+        console.log(`[Mint Signature] Returning existing pending signature for ${walletAddress}`);
+        return res.json({ 
+          success: true, 
+          signature: existingPending.signature,
+          nonce: existingPending.nonce,
+          message: "Returning existing pending signature (expires in 5 minutes)" 
         });
       }
 
@@ -399,14 +457,14 @@ export async function registerRoutes(
         CONFIG.CONTRACT_ADDRESS
       );
 
-      // Mark signature as issued
-      await storage.markSignatureIssued(progress.fid, walletAddress);
+      // Issue pending signature (not permanently marked yet)
+      await storage.issuePendingSignature(progress.fid, walletAddress, signature, nonce);
 
       return res.json({ 
         success: true, 
         signature,
         nonce,
-        message: "Signature generated successfully" 
+        message: "Signature generated successfully (valid for 5 minutes)" 
       });
     } catch (error) {
       console.error("Error generating mint signature:", error);

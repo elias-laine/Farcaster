@@ -154,9 +154,9 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
       setStatus("success");
       setHasMinted(true);
       
-      // Notify backend of successful mint
+      // Confirm mint with backend to permanently mark signature as issued
       try {
-        await fetch("/api/mint-confirmed", {
+        const confirmResponse = await fetch("/api/confirm-mint", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
@@ -165,6 +165,13 @@ export function MintSection({ isEligible, hasMinted: hasMintedProp, onMintSucces
             txHash: hash 
           }),
         });
+
+        const confirmResult = await confirmResponse.json();
+        if (!confirmResult.success) {
+          console.warn("Failed to confirm mint on backend:", confirmResult.message);
+        } else {
+          console.log("Mint confirmed on backend successfully");
+        }
       } catch (error) {
         console.warn("Failed to confirm mint on backend:", error);
       }
