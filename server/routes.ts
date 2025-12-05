@@ -386,8 +386,11 @@ export async function registerRoutes(
         });
       }
 
-      // Generate nonce
+      // Generate nonce based on timestamp to ensure uniqueness across server restarts
+      // This approach survives server restarts because nonce is based on current time
       const nonce = await storage.generateNonce();
+      
+      console.log(`[Mint Signature] Generated nonce: ${nonce} for wallet: ${walletAddress}`);
 
       // Generate signature
       const signature = await generateMintSignature(

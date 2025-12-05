@@ -30,13 +30,15 @@ export class MemStorage implements IStorage {
   private usedNonces: Set<number>;
   private winners: string[];
   private nonceCounter: number;
+  private walletNonces: Map<string, number>; // Track nonces per wallet to ensure uniqueness
 
   constructor() {
     this.userProgress = new Map();
     this.participants = new Map();
     this.usedNonces = new Set();
     this.winners = [];
-    this.nonceCounter = 1;
+    this.nonceCounter = Math.floor(Date.now() / 1000); // Start from current timestamp
+    this.walletNonces = new Map();
   }
 
   private getKey(fid: number, walletAddress: string): string {
@@ -175,8 +177,18 @@ export class MemStorage implements IStorage {
   }
 
   async generateNonce(): Promise<number> {
-    const nonce = this.nonceCounter++;
-    return nonce;
+    // Generate nonce based on timestamp to ensure uniqueness across server restarts
+    // This uses the current timestamp as the base and increments for multiple requests in the same second
+    const now = Math.floor(Date.now() / 1000);
+    
+    // If we've exceeded the current timestamp, keep incrementing
+    if (this.nonceCounter < now) {
+      this.nonceCounter = now;
+    } else {
+      this.nonceCounter++;
+    }
+    
+    return this.nonceCounter;
   }
 }
 
