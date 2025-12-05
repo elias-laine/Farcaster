@@ -288,5 +288,6 @@ export class MemStorage implements IStorage {
       console.log(`[Storage] Cleaned up ${cleanedCount} expired signatures`);
     }
   }
+}
 
 export const storage = new MemStorage();
