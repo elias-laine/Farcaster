@@ -844,12 +844,23 @@ export async function registerRoutes(
 
           const winnersSet = new Set(winners.map((w: string) => w.toLowerCase()));
 
-          // Map addresses to participant objects
-          const participants = participantAddresses.map((address: string) => ({
-            address: address.toLowerCase(),
-            mintedAt: Math.floor(Date.now() / 1000), // Fallback timestamp
-            isWinner: winnersSet.has(address.toLowerCase()),
-          }));
+          // Get participant data from local storage to get accurate mintedAt timestamps
+          const allParticipants = await storage.getParticipants();
+          const participantMap = new Map(
+            allParticipants.map(p => [p.address.toLowerCase(), p])
+          );
+
+          // Map addresses to participant objects with correct timestamps from storage
+          const participants = participantAddresses.map((address: string) => {
+            const lowerAddress = address.toLowerCase();
+            const storedParticipant = participantMap.get(lowerAddress);
+            
+            return {
+              address: lowerAddress,
+              mintedAt: storedParticipant?.mintedAt || Math.floor(Date.now() / 1000),
+              isWinner: winnersSet.has(lowerAddress),
+            };
+          });
 
           return res.json(participants);
         } catch (error) {
