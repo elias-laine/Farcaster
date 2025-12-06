@@ -54,6 +54,131 @@ interface Participant {
   isWinner: boolean;
 }
 
+function ManageTasksForm() {
+  const { walletAddress, connectWallet } = useFarcaster();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [config, setConfig] = useState({ castHash: '', targetFid: '', castUrl: '', targetUsername: '' });
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch('/api/admin/tasks-config');
+        const data = await res.json();
+        if (data.success) {
+          setConfig({
+            castHash: data.castHash || '',
+            targetFid: data.targetFid ? String(data.targetFid) : '',
+            castUrl: data.castUrl || '',
+            targetUsername: data.targetUsername || '',
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to fetch admin config', e);
+      }
+    };
+    fetchConfig();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    let currentWallet = walletAddress;
+    if (!currentWallet) {
+      const addr = await connectWallet();
+      if (!addr) return toast({ title: 'Wallet Required', description: 'Connect wallet to update tasks', variant: 'destructive' });
+      currentWallet = addr;
+    }
+
+    setLoading(true);
+    try {
+      // Step 1: Request challenge
+      console.log('[Admin] Requesting challenge for', currentWallet);
+      const challengeRes = await fetch('/api/admin/challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: currentWallet }),
+      });
+      
+      if (!challengeRes.ok) {
+        throw new Error('Failed to get challenge');
+      }
+
+      const challengeData = await challengeRes.json();
+      const challenge = challengeData.challenge;
+      console.log('[Admin] Got challenge');
+
+      // Step 2: Send update with challenge
+      console.log('[Admin] Sending update with challenge');
+      const updateRes = await fetch('/api/admin/tasks-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: currentWallet,
+          castHash: config.castHash,
+          targetFid: config.targetFid,
+          castUrl: config.castUrl,
+          targetUsername: config.targetUsername,
+          challenge,
+        }),
+      });
+
+      const updateData = await updateRes.json();
+      if (updateData.success) {
+        toast({ title: 'Updated', description: 'Tasks configuration updated' });
+      } else {
+        toast({ title: 'Failed', description: updateData.message || 'Update failed', variant: 'destructive' });
+      }
+    } catch (err) {
+      console.error('Update error', err);
+      toast({ title: 'Error', description: 'Failed to update tasks config', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium mb-1">Cast Hash</label>
+        <input 
+          value={config.castHash} 
+          onChange={e => setConfig({ ...config, castHash: e.target.value })} 
+          className="w-full px-3 py-2 border rounded-md"
+          placeholder="0x..."
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">Target FID</label>
+        <input 
+          value={config.targetFid} 
+          onChange={e => setConfig({ ...config, targetFid: e.target.value })} 
+          className="w-full px-3 py-2 border rounded-md"
+          placeholder="123456"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">Cast URL</label>
+        <input 
+          value={config.castUrl} 
+          onChange={e => setConfig({ ...config, castUrl: e.target.value })} 
+          className="w-full px-3 py-2 border rounded-md"
+          placeholder="https://..."
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">Target Username</label>
+        <input 
+          value={config.targetUsername} 
+          onChange={e => setConfig({ ...config, targetUsername: e.target.value })} 
+          className="w-full px-3 py-2 border rounded-md"
+          placeholder="@username"
+        />
+      </div>
+      <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save Changes'}</Button>
+    </form>
+  );
+}
+
 export default function Admin() {
   const { walletAddress } = useFarcaster();
   const { toast } = useToast();
@@ -256,6 +381,22 @@ export default function Admin() {
             </CardContent>
           </Card>
         </section>
+
+        {/* Manage Tasks Section */}
+        <Card className="border" data-testid="card-manage-tasks">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-primary" />
+              Manage Social Tasks
+            </CardTitle>
+            <CardDescription>
+              Configure the cast and user details for the social task requirement
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ManageTasksForm />
+          </CardContent>
+        </Card>
 
         {/* Execute Lottery Section - Only show if lottery hasn't been executed yet */}
         {!txHash && !lotteryStats?.isExecuted && (
