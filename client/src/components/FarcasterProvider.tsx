@@ -6,6 +6,7 @@ import {
   initializeSdk,
   connectFarcasterWallet,
   openExternalUrl,
+  composeCast,
 } from "@/lib/farcaster";
 
 interface FarcasterProviderProps {
@@ -65,6 +66,10 @@ export function FarcasterProvider({ children }: FarcasterProviderProps) {
     await openExternalUrl(url);
   }, []);
 
+  const handleComposeCast = useCallback(async (options: { text?: string; embeds?: any[] }) => {
+    await composeCast(options);
+  }, []);
+
   return (
     <FarcasterContext.Provider
       value={{
@@ -76,6 +81,7 @@ export function FarcasterProvider({ children }: FarcasterProviderProps) {
         openUrl,
         openCast,
         followUser,
+        composeCast: handleComposeCast,
       }}
     >
       {children}

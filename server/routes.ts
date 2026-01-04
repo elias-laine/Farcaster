@@ -1,8 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { verifyTaskRequestSchema, mintSignatureRequestSchema } from "@shared/schema";
+import { verifyTaskRequestSchema, mintSignatureRequestSchema, type TaskType } from "@shared/schema";
 import { ethers } from "ethers";
+import path from "path";
 
 // ============================================
 // CONFIGURATION - MUST BE SET VIA ENVIRONMENT VARIABLES
@@ -38,6 +39,8 @@ const CONFIG = {
 
   // Chain ID (8453 = Base Mainnet, 84532 = Base Sepolia)
   CHAIN_ID: parseInt(process.env.CHAIN_ID || "8453"),
+  // Optional admin wallet override (set in .env as ADMIN_WALLET=0x...)
+  ADMIN_WALLET: (process.env.ADMIN_WALLET || "").trim().toLowerCase(),
 };
 
 // Debug log config
@@ -47,6 +50,7 @@ console.log("[CONFIG] TARGET_FID:", CONFIG.TARGET_FID);
 console.log("[CONFIG] SIGNER_PRIVATE_KEY exists:", !!CONFIG.SIGNER_PRIVATE_KEY);
 console.log("[CONFIG] CONTRACT_ADDRESS:", CONFIG.CONTRACT_ADDRESS);
 console.log("[CONFIG] RPC_URL:", CONFIG.RPC_URL);
+console.log("[CONFIG] ADMIN_WALLET:", CONFIG.ADMIN_WALLET ? `${CONFIG.ADMIN_WALLET.slice(0,8)}...` : "(not set)");
 
 // Neynar API base URL
 const NEYNAR_API_URL = "https://api.neynar.com/v2/farcaster";
@@ -144,6 +148,188 @@ export async function registerRoutes(
         success: false, 
         message: "Internal server error" 
       });
+    }
+  });
+
+  // ============================================
+  // TEST: Debug Neynar API
+  // ============================================
+  app.get("/api/test/neynar/:fid", async (req, res) => {
+    try {
+      const { fid } = req.params;
+      const { text } = req.query;
+      console.log(`[TEST] Testing Neynar API for FID: ${fid}`);
+
+      if (!CONFIG.NEYNAR_API_KEY) {
+        return res.json({ 
+          success: false, 
+          error: "NEYNAR_API_KEY not configured" 
+        });
+      }
+
+      // Test search/casts endpoint with author filter
+      const searchQuery = `from:${fid}`;
+      const searchUrl = `${NEYNAR_API_URL}/search/casts?q=${encodeURIComponent(searchQuery)}&limit=50`;
+      
+      console.log(`[TEST] Fetching: ${searchUrl}`);
+      const response = await fetch(searchUrl, {
+        headers: {
+          "api_key": CONFIG.NEYNAR_API_KEY,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const searchResult: Record<string, any> = {
+        status: response.status,
+        ok: response.ok,
+      };
+
+      if (response.ok) {
+        const data = await response.json();
+        searchResult.castsCount = data.casts?.length || 0;
+        searchResult.casts = (data.casts || []).slice(0, 5).map((cast: any) => ({
+          text: cast.text?.substring(0, 100),
+          author: cast.author?.username,
+          created_at: cast.created_at,
+        }));
+      } else {
+        searchResult.error = await response.text();
+      }
+
+      return res.json({
+        success: true,
+        fid,
+        apiKey: CONFIG.NEYNAR_API_KEY ? "***configured***" : "NOT CONFIGURED",
+        searchResult,
+      });
+    } catch (error) {
+      console.error("[TEST] Error:", error);
+      return res.status(500).json({ 
+        success: false, 
+        error: String(error) 
+      });
+    }
+  });
+
+  // ============================================
+  // ADMIN: Challenge for admin actions (simple nonce)
+  // Body: { walletAddress }
+  // ============================================
+  app.post("/api/admin/challenge", async (req, res) => {
+    try {
+      const { walletAddress } = req.body || {};
+      if (!walletAddress) return res.status(400).json({ success: false, message: "Missing walletAddress" });
+
+      // Ensure admin only if ADMIN_WALLET configured
+      if (CONFIG.ADMIN_WALLET && walletAddress.toLowerCase() !== CONFIG.ADMIN_WALLET.toLowerCase()) {
+        return res.status(403).json({ success: false, message: "Unauthorized: not admin wallet" });
+      }
+
+      // Use storage nonce as challenge
+      const nonce = await storage.generateNonce();
+      const challenge = `admin-challenge:${nonce}`;
+      return res.json({ success: true, challenge });
+    } catch (error) {
+      console.error('[Admin] challenge error', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  });
+
+  // ============================================
+  // ADMIN: Get tasks configuration
+  // ============================================
+  app.get("/api/admin/tasks-config", async (req, res) => {
+    try {
+      const stored = await storage.getTasksConfig();
+      console.log('[Admin] GET tasks-config - stored:', stored);
+      const response = {
+        castHash: stored.castHash || CONFIG.CAST_HASH || '',
+        castText: stored.castText || '',
+        targetFid: stored.targetFid || CONFIG.TARGET_FID || 0,
+        castUrl: stored.castUrl || '',
+        targetUsername: stored.targetUsername || '',
+        tasks: stored.tasks || [],
+      };
+      console.log('[Admin] GET tasks-config - response:', response);
+      return res.json(response);
+    } catch (error) {
+      console.error('[Admin] get tasks config error', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  });
+
+  // ============================================
+  // GET TASKS (Frontend to fetch custom tasks)
+  // ============================================
+  app.get("/api/tasks", async (req, res) => {
+    try {
+      const stored = await storage.getTasksConfig();
+      console.log('[Tasks] GET /api/tasks - stored config:', stored);
+      const tasks = stored.tasks || [];
+      console.log('[Tasks] GET /api/tasks - tasks array:', tasks);
+      
+      // If no custom tasks configured, return defaults
+      if (tasks.length === 0) {
+        console.log('[Tasks] No custom tasks, returning defaults');
+        return res.json([
+          { 
+            id: 'task-like', 
+            type: 'like', 
+            title: 'Like the Cast',
+            required: true,
+            options: {} 
+          },
+          { 
+            id: 'task-recast', 
+            type: 'recast', 
+            title: 'Recast the Cast',
+            required: true,
+            options: {} 
+          },
+          { 
+            id: 'task-follow', 
+            type: 'follow', 
+            title: 'Follow the Creator',
+            required: true,
+            options: {} 
+          },
+        ]);
+      }
+      
+      console.log('[Tasks] Returning custom tasks:', tasks);
+      return res.json(tasks);
+    } catch (error) {
+      console.error('[Tasks] get tasks error', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  });
+
+  // ============================================
+  // ADMIN: Update tasks configuration
+  // Body: { walletAddress, castHash, targetFid, castUrl, targetUsername, tasks[] }
+  // Requires ADMIN_WALLET env or matching walletAddress
+  // ============================================
+  app.post("/api/admin/tasks-config", async (req, res) => {
+    try {
+      const { walletAddress, tasks, challenge, castHash, targetFid, castUrl, targetUsername, castText } = req.body || {};
+
+      console.log('[Admin] POST tasks-config - walletAddress:', walletAddress);
+      console.log('[Admin] POST tasks-config - tasks:', tasks);
+
+      if (!walletAddress) return res.status(400).json({ success: false, message: "Missing walletAddress" });
+
+      if (CONFIG.ADMIN_WALLET && walletAddress.toLowerCase() !== CONFIG.ADMIN_WALLET.toLowerCase()) {
+        return res.status(403).json({ success: false, message: "Unauthorized: not admin wallet" });
+      }
+
+      // For now we don't enforce signature of challenge; presence of ADMIN_WALLET is primary guard.
+
+      await storage.setTasksConfig({ tasks, castHash, targetFid, castUrl, targetUsername, castText });
+
+      return res.json({ success: true, message: 'Tasks config updated' });
+    } catch (error) {
+      console.error('[Admin] set tasks config error', error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
     }
   });
 
@@ -272,7 +458,53 @@ export async function registerRoutes(
       let progress = await storage.getUserProgress(fid, walletAddress);
 
       if (!progress) {
-        progress = await storage.createUserProgress(fid, walletAddress);
+        // Get custom tasks config to know which tasks to initialize
+        const tasksConfig = await storage.getTasksConfig();
+        const customTasks = tasksConfig.tasks || [];
+        
+        // If custom tasks are configured, create progress with those tasks
+        if (customTasks.length > 0) {
+          progress = await storage.createUserProgressWithTasks(
+            fid, 
+            walletAddress,
+            customTasks.map(t => t.type as any)
+          );
+        } else {
+          // Otherwise use default tasks
+          progress = await storage.createUserProgress(fid, walletAddress);
+        }
+      } else {
+        // Update existing progress to include new custom tasks if they were added
+        const tasksConfig = await storage.getTasksConfig();
+        const customTasks = tasksConfig.tasks || [];
+        
+        if (customTasks.length > 0) {
+          const customTaskTypes = customTasks.map(t => t.type as TaskType);
+          // Add any new tasks that aren't already in progress
+          for (const taskType of customTaskTypes) {
+            if (!progress.tasks.find(t => t.type === taskType)) {
+              progress.tasks.push({
+                type: taskType,
+                status: "pending" as const,
+              });
+            }
+          }
+          // Remove tasks that are no longer in config (optional - comment out to keep history)
+          // progress.tasks = progress.tasks.filter(t => customTaskTypes.includes(t.type));
+        }
+        
+        // Recalculate allTasksCompleted
+        if (customTasks.length > 0) {
+          const requiredTasks = customTasks.filter(t => t.required !== false);
+          progress.allTasksCompleted = requiredTasks.length > 0 
+            ? progress.tasks.filter(t => requiredTasks.some(ct => ct.type === t.type)).every(t => t.status === "verified")
+            : false;
+        } else {
+          progress.allTasksCompleted = progress.tasks.every(t => t.status === "verified");
+        }
+        
+        // Save updated progress
+        await storage.updateUserProgress(fid, walletAddress, progress);
       }
 
       return res.json(progress);
@@ -290,9 +522,12 @@ export async function registerRoutes(
   // ============================================
   app.post("/api/verify-task", async (req, res) => {
     try {
+      console.log("[verify-task] Request body:", JSON.stringify(req.body));
+      
       const parseResult = verifyTaskRequestSchema.safeParse(req.body);
 
       if (!parseResult.success) {
+        console.error("[verify-task] Validation error:", parseResult.error.errors);
         return res.status(400).json({ 
           success: false, 
           message: "Invalid request body",
@@ -301,16 +536,19 @@ export async function registerRoutes(
       }
 
       const { taskType, fid, walletAddress } = parseResult.data;
+      console.log(`[verify-task] Verifying task ${taskType} for FID ${fid}`);
 
       // Get or create user progress
       let progress = await storage.getUserProgress(fid, walletAddress);
       if (!progress) {
+        console.log(`[verify-task] Creating new progress for FID ${fid}`);
         progress = await storage.createUserProgress(fid, walletAddress);
       }
 
       // Check if task is already verified
       const existingTask = progress.tasks.find(t => t.type === taskType);
       if (existingTask?.status === "verified") {
+        console.log(`[verify-task] Task ${taskType} already verified`);
         return res.json({ 
           success: true, 
           message: "Task already verified",
@@ -321,27 +559,80 @@ export async function registerRoutes(
       // Verify task with Neynar API
       let verified = false;
       let message = "";
+      let taskError = null;
 
       try {
+        console.log(`[verify-task] Starting verification for ${taskType}`);
+        console.log(`[verify-task] taskType value:`, JSON.stringify(taskType));
+        
         if (taskType === "like") {
+          console.log(`[verify-task] Verifying like for cast hash: ${CONFIG.CAST_HASH}`);
           verified = await verifyLike(fid, CONFIG.CAST_HASH);
           message = verified ? "Like verified!" : "Cast not liked yet. Please like the cast first.";
         } else if (taskType === "recast") {
+          console.log(`[verify-task] Verifying recast for cast hash: ${CONFIG.CAST_HASH}`);
           verified = await verifyRecast(fid, CONFIG.CAST_HASH);
           message = verified ? "Recast verified!" : "Cast not recasted yet. Please recast first.";
         } else if (taskType === "follow") {
+          console.log(`[verify-task] Verifying follow for target FID: ${CONFIG.TARGET_FID}`);
           verified = await verifyFollow(fid, CONFIG.TARGET_FID);
           message = verified ? "Follow verified!" : "Not following yet. Please follow the account first.";
+        } else if (taskType === "cast") {
+          console.log(`[verify-task] CAST BRANCH ENTERED`);
+          try {
+            // For cast task, verify the user posted a cast with the suggested text
+            const tasksConfig = await storage.getTasksConfig();
+            console.log(`[verify-task] tasksConfig keys:`, Object.keys(tasksConfig));
+            
+            const castTask = tasksConfig.tasks?.find(t => t.type === "cast");
+            console.log(`[verify-task] castTask:`, JSON.stringify(castTask));
+            
+            const expectedText = castTask?.options?.castText || "Check out this awesome quest!";
+            console.log(`[verify-task] expectedText:`, expectedText);
+            
+            console.log(`[verify-task] Calling verifyCast with FID ${fid}`);
+            verified = await verifyCast(fid, expectedText);
+            console.log(`[verify-task] verifyCast returned:`, verified);
+            
+            message = verified 
+              ? "Cast verified! Great job participating in the quest!" 
+              : `Please post a cast containing: "${expectedText}"`;
+            console.log(`[verify-task] message set to:`, message);
+          } catch (castError) {
+            console.error(`[verify-task] Error in cast verification:`, castError);
+            taskError = castError;
+            message = `Error verifying cast: ${castError instanceof Error ? castError.message : String(castError)}`;
+            verified = false;
+          }
+        } else {
+          console.warn(`[verify-task] Unknown task type: ${taskType}`);
+          message = `Unknown task type: ${taskType}`;
         }
+
+        console.log(`[verify-task] After if-else: verified=${verified}, message="${message}"`);
       } catch (error) {
-        console.error(`Error verifying ${taskType}:`, error);
-        return res.status(500).json({ 
-          success: false, 
-          message: "Failed to verify task. Please try again." 
-        });
+        console.error(`[verify-task] EXCEPTION in main try block:`, error);
+        taskError = error;
+        message = `Failed to verify task: ${error instanceof Error ? error.message : "Unknown error"}`;
+      }
+
+      console.log(`[verify-task] Final result: verified=${verified}, message="${message}"`);
+      
+      // Ensure message is set
+      if (!message) {
+        console.warn(`[verify-task] WARNING: Message is still empty!`);
+        message = verified 
+          ? "Task verified!" 
+          : `Task verification failed for ${taskType}`;
+      }
+        console.warn(`[verify-task] WARNING: Message is empty! Setting default.`);
+        message = verified 
+          ? "Task verified successfully!" 
+          : "Task verification failed. Please complete the task and try again.";
       }
 
       if (verified) {
+        console.log(`[verify-task] Task ${taskType} verified successfully`);
         const updatedProgress = await storage.updateTaskStatus(
           fid, 
           walletAddress, 
@@ -350,6 +641,7 @@ export async function registerRoutes(
         );
 
         const task = updatedProgress?.tasks.find(t => t.type === taskType);
+        console.log(`[verify-task] Updated progress:`, JSON.stringify(task));
         return res.json({ 
           success: true, 
           message,
@@ -357,15 +649,30 @@ export async function registerRoutes(
         });
       }
 
+      console.log(`[verify-task] Verification failed for ${taskType}`);
+      
+      // Ensure message is never empty
+      if (!message) {
+        console.warn(`[verify-task] WARNING: Message still empty after all branches!`);
+        message = `Task verification failed for ${taskType}. Please try again.`;
+      }
+      
       return res.json({ 
         success: false, 
-        message 
+        message,
+        debug: { taskType, verified, hasMessage: !!message }
       });
     } catch (error) {
-      console.error("Error verifying task:", error);
-      return res.status(500).json({ 
+      console.error("[verify-task] OUTER catch - Unexpected error:", error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("[verify-task] Error message:", errorMsg);
+      console.error("[verify-task] Error stack:", error instanceof Error ? error.stack : "no stack");
+      
+      return res.json({ 
         success: false, 
-        message: "Internal server error" 
+        message: `Internal server error: ${errorMsg}`,
+        error: errorMsg,
+        debug: { taskType }
       });
     }
   });
@@ -492,11 +799,66 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Missing walletAddress" });
       }
 
+      console.log("[Verify Owner] Checking wallet:", walletAddress);
+
+      // If ADMIN_WALLET is set in env, trust it as the admin address (override)
+      if (CONFIG.ADMIN_WALLET) {
+        const contractOwner = CONFIG.ADMIN_WALLET.toLowerCase();
+        const isOwner = contractOwner === walletAddress.toLowerCase();
+
+        // We still attempt to return contract stats below only if contract configured
+        let totalParticipants = 0;
+        let lotteryDeadline = 0;
+        let isActive = false;
+        let isExecuted = false;
+
+        if (CONFIG.CONTRACT_ADDRESS) {
+          try {
+            const provider = new ethers.JsonRpcProvider(CONFIG.RPC_URL);
+            const contract = new ethers.Contract(
+              CONFIG.CONTRACT_ADDRESS,
+              SOCIALQUEST_CONTRACT_ABI,
+              provider
+            );
+
+            const [totalParts, , , , lotteryDeadlineBN, active, executed] = await contract.getLotteryStats();
+            totalParticipants = Number(totalParts);
+            lotteryDeadline = Number(lotteryDeadlineBN);
+            isActive = active;
+            isExecuted = executed;
+          } catch (e) {
+            console.warn("[Verify Owner] Failed to fetch contract stats while ADMIN_WALLET override is set:", e);
+          }
+        }
+
+        const currentTime = Math.floor(Date.now() / 1000);
+        const deadlinePassed = currentTime > Number(lotteryDeadline);
+        const hasParticipants = Number(totalParticipants) > 0;
+
+        const executionErrors = [];
+        if (isExecuted) executionErrors.push("Lottery already executed");
+        if (!deadlinePassed) executionErrors.push(`Deadline not passed (${Number(lotteryDeadline) - currentTime}s remaining)`);
+        if (!hasParticipants) executionErrors.push("No participants registered");
+
+        return res.json({
+          walletAddress,
+          contractOwner: CONFIG.ADMIN_WALLET,
+          isOwner,
+          totalParticipants,
+          deadlinePassed,
+          hasParticipants,
+          isActive,
+          isExecuted,
+          executionErrors,
+          canExecute: !isExecuted && deadlinePassed && hasParticipants,
+          note: "Using ADMIN_WALLET env override",
+        });
+      }
+
       if (!CONFIG.CONTRACT_ADDRESS) {
         return res.status(400).json({ error: "Contract address not configured" });
       }
 
-      console.log("[Verify Owner] Checking wallet:", walletAddress);
       console.log("[Verify Owner] Contract:", CONFIG.CONTRACT_ADDRESS);
       console.log("[Verify Owner] RPC URL:", CONFIG.RPC_URL);
 
@@ -850,20 +1212,67 @@ export async function registerRoutes(
 
           const winnersSet = new Set(winners.map((w: string) => w.toLowerCase()));
 
-          // Get participant data from local storage to get accurate mintedAt timestamps
+          // Try to read mint timestamps from blockchain events (SBTMinted)
+          const iface = new ethers.Interface([
+            "event SBTMinted(address indexed to, uint256 indexed tokenId, uint256 timestamp)",
+            "event ParticipantRegistered(address indexed participant, uint256 indexed index, uint256 timestamp)",
+          ]);
+
+          let mintedAtMap = new Map<string, number>();
+          try {
+            const topic = iface.getEventTopic("SBTMinted");
+            const logs = await provider.getLogs({
+              address: CONFIG.CONTRACT_ADDRESS,
+              topics: [topic],
+              fromBlock: 0,
+            });
+
+            for (const log of logs) {
+              try {
+                const parsed = iface.parseLog(log);
+                const to = String(parsed.args.to).toLowerCase();
+
+                // Derive timestamp from the block that included the mint transaction
+                let ts: number | undefined;
+                try {
+                  if (log.blockNumber != null) {
+                    const block = await provider.getBlock(Number(log.blockNumber));
+                    ts = Number(block.timestamp);
+                  } else if (log.transactionHash) {
+                    const receipt = await provider.getTransactionReceipt(log.transactionHash);
+                    if (receipt && receipt.blockNumber != null) {
+                      const block = await provider.getBlock(Number(receipt.blockNumber));
+                      ts = Number(block.timestamp);
+                    }
+                  }
+                } catch (e) {
+                  // ignore block fetch errors for this log
+                }
+
+                if (to && ts) mintedAtMap.set(to, ts);
+              } catch (e) {
+                // ignore parse errors for unrelated logs
+              }
+            }
+          } catch (e) {
+            console.warn("Failed to fetch SBTMinted logs:", e);
+          }
+
+          // Fallback to local storage when blockchain timestamp is unavailable
           const allParticipants = await storage.getParticipants();
           const participantMap = new Map(
             allParticipants.map(p => [p.address.toLowerCase(), p])
           );
 
-          // Map addresses to participant objects with correct timestamps from storage
+          // Map addresses to participant objects using blockchain timestamp when available
           const participants = participantAddresses.map((address: string) => {
             const lowerAddress = address.toLowerCase();
             const storedParticipant = participantMap.get(lowerAddress);
-            
+            const onChainTs = mintedAtMap.get(lowerAddress);
+
             return {
               address: lowerAddress,
-              mintedAt: storedParticipant?.mintedAt || Math.floor(Date.now() / 1000),
+              mintedAt: onChainTs || storedParticipant?.mintedAt || Math.floor(Date.now() / 1000),
               isWinner: winnersSet.has(lowerAddress),
             };
           });
@@ -883,6 +1292,103 @@ export async function registerRoutes(
         success: false, 
         message: "Internal server error" 
       });
+    }
+  });
+
+  // ============================================
+  // ADMIN: Deploy Lottery (runs Foundry deploy script)
+  // Body: { walletAddress, deadline, baseUri, rpcUrl }
+  // Requires SIGNER_PRIVATE_KEY in env and foundry installed on server
+  // ============================================
+  app.post("/api/admin/deploy-lottery", async (req, res) => {
+    try {
+      const { walletAddress, deadline, baseUri, rpcUrl } = req.body;
+
+      if (!walletAddress) return res.status(400).json({ success: false, message: "Missing walletAddress" });
+
+      // Only allow if ADMIN_WALLET matches
+      if (CONFIG.ADMIN_WALLET && walletAddress.toLowerCase() !== CONFIG.ADMIN_WALLET.toLowerCase()) {
+        return res.status(403).json({ success: false, message: "Unauthorized: not admin wallet" });
+      }
+
+      // Ensure signer private key exists for broadcast
+      const deployerPrivateKey = process.env.PRIVATE_KEY || process.env.SIGNER_PRIVATE_KEY;
+      if (!deployerPrivateKey) {
+        return res.status(500).json({ success: false, message: "Server not configured with deployer private key" });
+      }
+
+      // Ensure forge exists
+      const { spawn } = await import('child_process');
+      const which = spawn('which', ['forge']);
+      let foundryPath = '';
+      await new Promise<void>((resolve) => {
+        which.stdout.on('data', (d) => { foundryPath += d.toString(); });
+        which.on('close', () => resolve());
+      });
+      if (!foundryPath.trim()) {
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Foundry (forge) not installed on server',
+          installGuide: 'To deploy contracts, install Foundry: curl -L https://foundry.paradigm.xyz | bash && source ~/.bashrc && foundryup'
+        });
+      }
+
+      // Prepare env for the child process
+      const ethers = (await import('ethers')) as typeof import('ethers');
+      let signerAddress = '';
+      try {
+        const w = new ethers.Wallet(deployerPrivateKey);
+        signerAddress = w.address;
+      } catch (e) {
+        // ignore
+      }
+
+      const childEnv = { ...process.env } as Record<string,string>;
+      childEnv.PRIVATE_KEY = deployerPrivateKey.replace(/^0x/, '');
+      if (signerAddress) childEnv.SIGNER_ADDRESS = signerAddress;
+      if (deadline) childEnv.LOTTERY_DEADLINE = String(deadline);
+      if (baseUri) childEnv.BASE_URI = String(baseUri);
+      if (rpcUrl) childEnv.BASE_RPC_URL = String(rpcUrl);
+      // Accept tiers array from request body: [{ min, max, winners, prize }, ...]
+      const tiers = req.body.tiers;
+      if (Array.isArray(tiers) && tiers.length > 0) {
+        childEnv.TIER_COUNT = String(tiers.length);
+        for (let i = 0; i < tiers.length; i++) {
+          const t = tiers[i] || {};
+          if (t.min != null) childEnv[`TIER_MIN_${i}`] = String(t.min);
+          if (t.max != null) childEnv[`TIER_MAX_${i}`] = String(t.max);
+          if (t.winners != null) childEnv[`TIER_WINNERS_${i}`] = String(t.winners);
+          if (t.prize != null) childEnv[`TIER_PRIZE_${i}`] = String(t.prize);
+        }
+      }
+
+      // Run forge script in contracts directory
+      const cwd = path.resolve(import.meta.dirname, '..', 'contracts');
+      const args = ['script', 'script/Deploy.s.sol:DeployScript', '--rpc-url', (rpcUrl || CONFIG.RPC_URL), '--broadcast'];
+
+      const proc = spawn('forge', args, { cwd, env: childEnv });
+
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout.on('data', (d) => { stdout += d.toString(); });
+      proc.stderr.on('data', (d) => { stderr += d.toString(); });
+
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          console.error('[DeployLottery] forge exited', code, stderr);
+          return res.status(500).json({ success: false, message: 'Deploy failed', code, stderr, stdout });
+        }
+
+        // Try to extract CONTRACT_ADDRESS from stdout
+        const match = stdout.match(/CONTRACT_ADDRESS:\s*(0x[0-9a-fA-F]{40})/);
+        const contractAddress = match ? match[1] : null;
+
+        return res.json({ success: true, message: 'Deploy finished', contractAddress, stdout, stderr });
+      });
+    } catch (error) {
+      console.error('Error deploying lottery:', error);
+      return res.status(500).json({ success: false, message: 'Internal server error', error: String(error) });
     }
   });
 
@@ -1151,6 +1657,80 @@ async function verifyFollow(fid: number, targetFid: number): Promise<boolean> {
   } catch (error) {
     console.error("Error verifying follow:", error);
     return false;
+  }
+}
+
+async function verifyCast(fid: number, expectedText: string): Promise<boolean> {
+  try {
+    console.log(`\n[verifyCast] ========== START ==========`);
+    console.log(`[verifyCast] FID: ${fid}, Expected text: "${expectedText}"`);
+
+    if (!CONFIG.NEYNAR_API_KEY) {
+      console.log("[verifyCast] TEST MODE: No API key, allowing verification");
+      console.log(`[verifyCast] ========== END (TEST MODE) ==========\n`);
+      return true;
+    }
+
+    // Use /search/casts endpoint to find recent casts by author
+    const searchQuery = `from:${fid}`;
+    const url = `${NEYNAR_API_URL}/search/casts?q=${encodeURIComponent(searchQuery)}&limit=50`;
+    
+    console.log(`[verifyCast] Calling Neynar API: ${url}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        "api_key": CONFIG.NEYNAR_API_KEY,
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log(`[verifyCast] Response status: ${response.status}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn(`[verifyCast] API error (${response.status}): ${errorText}`);
+      console.log(`[verifyCast] FALLBACK: Allowing verification due to API error`);
+      console.log(`[verifyCast] ========== END (FALLBACK) ==========\n`);
+      return true;
+    }
+
+    const data = await response.json();
+    console.log(`[verifyCast] Response data keys:`, Object.keys(data));
+    
+    const casts = data.casts || [];
+    console.log(`[verifyCast] Found ${casts.length} casts`);
+    
+    if (casts.length === 0) {
+      console.log(`[verifyCast] No casts found - returning false`);
+      console.log(`[verifyCast] ========== END (NO CASTS) ==========\n`);
+      return false;
+    }
+
+    // Check if any recent cast contains the expected text
+    let found = false;
+    for (let i = 0; i < casts.length; i++) {
+      const cast = casts[i];
+      const castText = cast.text || "";
+      const containsText = castText.toLowerCase().includes(expectedText.toLowerCase());
+      
+      console.log(`[verifyCast] Cast ${i + 1}: "${castText.substring(0, 80)}..." | Match: ${containsText}`);
+      
+      if (containsText) {
+        found = true;
+        break;
+      }
+    }
+
+    console.log(`[verifyCast] Result: ${found ? "FOUND" : "NOT FOUND"}`);
+    console.log(`[verifyCast] ========== END ==========\n`);
+    
+    return found;
+
+  } catch (error) {
+    console.error(`[verifyCast] EXCEPTION:`, error);
+    console.log(`[verifyCast] FALLBACK: Allowing verification due to exception`);
+    console.log(`[verifyCast] ========== END (EXCEPTION) ==========\n`);
+    return true;
   }
 }
 

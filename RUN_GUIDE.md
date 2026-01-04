@@ -93,6 +93,35 @@ npm install
 npm run dev
 ```
 
+## 🔧 برای Deploy Contracts (Admin Only)
+
+### اگر "Foundry not installed" خطا دیدید:
+
+```bash
+# نصب Foundry (خودکار)
+bash setup-foundry.sh
+
+# یا دستی
+curl -L https://foundry.paradigm.xyz | bash
+source ~/.bashrc
+foundryup
+```
+
+سپس dev server را restart کنید:
+```bash
+npm run start:dev
+```
+
+📚 بیشتر در:
+- [FOUNDRY_QUICK_FIX.md](./FOUNDRY_QUICK_FIX.md) - حل سریع
+- [FOUNDRY_INSTALLATION.md](./FOUNDRY_INSTALLATION.md) - راهنمای کامل
+
+## 🎮 تست Features
+rm -rf node_modules package-lock.json
+npm install
+npm run dev
+```
+
 ## 🎮 تست Features
 
 1. **Home Page** - Task verification

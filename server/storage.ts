@@ -1,4 +1,4 @@
-import type { Task, TaskType, UserProgress, LotteryStats } from "@shared/schema";
+import type { Task, TaskType, UserProgress, LotteryStats, AdminTask } from "@shared/schema";
 import { getCurrentTier } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -15,6 +15,8 @@ export interface IStorage {
   // User progress
   getUserProgress(fid: number, walletAddress: string): Promise<UserProgress | undefined>;
   createUserProgress(fid: number, walletAddress: string): Promise<UserProgress>;
+  createUserProgressWithTasks(fid: number, walletAddress: string, taskTypes: TaskType[]): Promise<UserProgress>;
+  updateUserProgress(fid: number, walletAddress: string, progress: UserProgress): Promise<UserProgress>;
   updateTaskStatus(fid: number, walletAddress: string, taskType: TaskType, status: "pending" | "verified" | "failed"): Promise<UserProgress | undefined>;
   markUserMinted(fid: number, walletAddress: string): Promise<UserProgress | undefined>;
   markSignatureIssued(fid: number, walletAddress: string): Promise<UserProgress | undefined>;
@@ -35,9 +37,13 @@ export interface IStorage {
   getPendingSignature(fid: number, walletAddress: string): Promise<PendingSignature | undefined>;
   confirmSignatureIssued(fid: number, walletAddress: string): Promise<void>;
   cleanupExpiredSignatures(): Promise<void>;
+
+  // Admin tasks config
+  getTasksConfig(): Promise<{ castHash?: string; castText?: string; targetFid?: number; castUrl?: string; targetUsername?: string; tasks?: AdminTask[] }>;
+  setTasksConfig(config: { castHash?: string; castText?: string; targetFid?: number; castUrl?: string; targetUsername?: string; tasks?: AdminTask[] }): Promise<void>;
 }
 
-const TASK_TYPES: TaskType[] = ["like", "recast", "follow"];
+const TASK_TYPES: TaskType[] = ["like", "recast", "follow", "cast"];
 
 export class MemStorage implements IStorage {
   private userProgress: Map<string, UserProgress>;
@@ -47,6 +53,8 @@ export class MemStorage implements IStorage {
   private nonceCounter: number;
   private walletNonces: Map<string, number>; // Track nonces per wallet to ensure uniqueness
   private pendingSignatures: Map<string, PendingSignature>; // walletAddress -> PendingSignature
+  // Admin config storage
+  private tasksConfig: { castHash?: string; castText?: string; targetFid?: number; castUrl?: string; targetUsername?: string; tasks?: AdminTask[] };
   private readonly SIGNATURE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
   private cleanupInterval: NodeJS.Timeout | null = null;
 
@@ -58,6 +66,7 @@ export class MemStorage implements IStorage {
     this.nonceCounter = Math.floor(Date.now() / 1000); // Start from current timestamp
     this.walletNonces = new Map();
     this.pendingSignatures = new Map();
+    this.tasksConfig = { castHash: '', castText: '', targetFid: 0, castUrl: '', targetUsername: '', tasks: [] };
 
     // Auto cleanup expired signatures every minute
     this.cleanupInterval = setInterval(() => {
@@ -94,6 +103,30 @@ export class MemStorage implements IStorage {
       signatureIssued: false,
     };
 
+    this.userProgress.set(key, progress);
+    return progress;
+  }
+
+  async createUserProgressWithTasks(fid: number, walletAddress: string, taskTypes: TaskType[]): Promise<UserProgress> {
+    const key = this.getKey(fid, walletAddress);
+    
+    const progress: UserProgress = {
+      fid,
+      walletAddress: walletAddress.toLowerCase(),
+      tasks: taskTypes.map(type => ({
+        type,
+        status: "pending" as const,
+      })),
+      allTasksCompleted: false,
+      signatureIssued: false,
+    };
+
+    this.userProgress.set(key, progress);
+    return progress;
+  }
+
+  async updateUserProgress(fid: number, walletAddress: string, progress: UserProgress): Promise<UserProgress> {
+    const key = this.getKey(fid, walletAddress);
     this.userProgress.set(key, progress);
     return progress;
   }
@@ -287,6 +320,20 @@ export class MemStorage implements IStorage {
     if (cleanedCount > 0) {
       console.log(`[Storage] Cleaned up ${cleanedCount} expired signatures`);
     }
+  }
+
+  async getTasksConfig(): Promise<{ castHash?: string; castText?: string; targetFid?: number; castUrl?: string; targetUsername?: string; tasks?: AdminTask[] }> {
+    return this.tasksConfig;
+  }
+
+  async setTasksConfig(config: { castHash?: string; castText?: string; targetFid?: number; castUrl?: string; targetUsername?: string; tasks?: AdminTask[] }): Promise<void> {
+    if (config.castHash !== undefined) this.tasksConfig.castHash = config.castHash;
+    if (config.castText !== undefined) this.tasksConfig.castText = config.castText;
+    if (config.targetFid !== undefined) this.tasksConfig.targetFid = config.targetFid;
+    if (config.castUrl !== undefined) this.tasksConfig.castUrl = config.castUrl;
+    if (config.targetUsername !== undefined) this.tasksConfig.targetUsername = config.targetUsername;
+    if (Array.isArray(config.tasks)) this.tasksConfig.tasks = config.tasks;
+    console.log('[Storage] Updated tasks config', this.tasksConfig);
   }
 }
 

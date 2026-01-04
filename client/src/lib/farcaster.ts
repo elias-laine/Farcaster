@@ -18,6 +18,7 @@ export interface FarcasterContextType {
   openUrl: (url: string) => Promise<void>;
   openCast: (hash: string) => Promise<void>;
   followUser: (fid: number) => Promise<void>;
+  composeCast: (options: { text?: string; embeds?: any[] }) => Promise<void>;
 }
 
 // Create context with default values
@@ -30,6 +31,7 @@ export const FarcasterContext = createContext<FarcasterContextType>({
   openUrl: async () => {},
   openCast: async () => {},
   followUser: async () => {},
+  composeCast: async () => {},
 });
 
 // Hook to use Farcaster context
@@ -92,6 +94,22 @@ export async function openExternalUrl(url: string): Promise<void> {
     console.error("Failed to open URL:", error);
     // Fallback to window.open
     window.open(url, "_blank");
+  }
+}
+
+export async function composeCast(options: {
+  text?: string;
+  embeds?: any[];
+}): Promise<void> {
+  try {
+    await sdk.actions.composeCast(options);
+  } catch (error) {
+    console.error("Failed to compose cast:", error);
+    // Fallback to URL-based compose
+    if (options.text) {
+      const composeUrl = `https://warpcast.com/compose?text=${encodeURIComponent(options.text)}`;
+      window.open(composeUrl, "_blank");
+    }
   }
 }
 

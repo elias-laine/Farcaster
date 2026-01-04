@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // Task types for social verification
-export const taskTypes = ["like", "recast", "follow"] as const;
+export const taskTypes = ["like", "recast", "follow", "cast"] as const;
 export type TaskType = typeof taskTypes[number];
 
 // Task status
@@ -11,12 +11,43 @@ export type TaskStatus = typeof taskStatuses[number];
 // Task configuration schema
 export const taskConfigSchema = z.object({
   castHash: z.string().describe("Hash of the cast to like/recast"),
+  castText: z.string().optional().describe("Text/content of the cast to display or require"),
   castUrl: z.string().describe("URL of the cast for display"),
   targetFid: z.number().describe("Farcaster ID of the account to follow"),
   targetUsername: z.string().describe("Username of the account to follow"),
 });
 
 export type TaskConfig = z.infer<typeof taskConfigSchema>;
+
+// Admin task item schema (used in admin UI)
+export const adminTaskOptionsSchema = z.object({
+  castHash: z.string().optional(),
+  castText: z.string().optional(),
+  castUrl: z.string().optional(),
+  targetFid: z.number().optional(),
+  targetUsername: z.string().optional(),
+}).optional();
+
+export const adminTaskSchema = z.object({
+  id: z.string(),
+  type: z.enum(taskTypes),
+  title: z.string().optional(),
+  required: z.boolean().optional(),
+  options: adminTaskOptionsSchema,
+});
+
+export type AdminTask = z.infer<typeof adminTaskSchema>;
+
+export const adminTasksConfigSchema = z.object({
+  castHash: z.string().optional(),
+  castText: z.string().optional(),
+  castUrl: z.string().optional(),
+  targetFid: z.number().optional(),
+  targetUsername: z.string().optional(),
+  tasks: z.array(adminTaskSchema).optional(),
+});
+
+export type AdminTasksConfig = z.infer<typeof adminTasksConfigSchema>;
 
 // Individual task schema
 export const taskSchema = z.object({

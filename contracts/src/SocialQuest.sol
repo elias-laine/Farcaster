@@ -115,26 +115,32 @@ contract SocialQuest is ERC721, Ownable, ReentrancyGuard {
     constructor(
         address _signer,
         uint256 _deadline,
+        uint256[] memory tierMins,
+        uint256[] memory tierMaxs,
+        uint256[] memory tierWinners,
+        uint256[] memory tierPrizes,
         string memory _name,
         string memory _symbol,
         string memory baseURI_
     ) ERC721(_name, _symbol) Ownable(msg.sender) {
         if (_signer == address(0)) revert ZeroAddress();
         if (_deadline <= block.timestamp) revert InvalidDeadline();
-        
+
+        if (tierMins.length == 0 || tierMins.length != tierMaxs.length || tierMins.length != tierWinners.length || tierMins.length != tierPrizes.length) revert InvalidDeadline();
+
         signer = _signer;
         deadline = _deadline;
         _baseTokenURI = baseURI_;
 
-        // Initialize default prize tiers with default prize amount (~$5 USD at current ETH price)
-        // Default: 0.002 ETH (approximately $5 at $2,500/ETH)
-        // Call updatePrizeAmounts() after deployment to set the correct amount based on current price
-        uint256 defaultPrizeInWei = 2 * 10**15;  // 0.002 ETH
-        
-        prizeTiers.push(PrizeTier({ minParticipants: 0, maxParticipants: 99, winnersCount: 1, prizePerWinner: defaultPrizeInWei }));
-        prizeTiers.push(PrizeTier({ minParticipants: 100, maxParticipants: 499, winnersCount: 2, prizePerWinner: defaultPrizeInWei }));
-        prizeTiers.push(PrizeTier({ minParticipants: 500, maxParticipants: 999, winnersCount: 3, prizePerWinner: defaultPrizeInWei }));
-        prizeTiers.push(PrizeTier({ minParticipants: 1000, maxParticipants: 0, winnersCount: 4, prizePerWinner: defaultPrizeInWei }));
+        // Initialize prize tiers from constructor args
+        for (uint256 i = 0; i < tierMins.length; i++) {
+            prizeTiers.push(PrizeTier({
+                minParticipants: tierMins[i],
+                maxParticipants: tierMaxs[i],
+                winnersCount: tierWinners[i],
+                prizePerWinner: tierPrizes[i]
+            }));
+        }
     }
 
     // ============================================

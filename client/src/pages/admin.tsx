@@ -7,13 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Trophy, Users, Clock, AlertCircle, CheckCircle2, Loader2, ExternalLink, RefreshCw } from "lucide-react";
 import { useFarcaster } from "@/lib/farcaster";
 import { APP_CONFIG } from "@/lib/config";
 import { sendTransaction } from "@/lib/farcaster";
 import { encodeFunctionData } from "viem";
 import { useToast } from "@/hooks/use-toast";
-import type { LotteryStats } from "@shared/schema";
+import { parseEther } from 'ethers';
+import { DeployLotteryForm } from "@/components/DeployLotteryForm";
+import type { LotteryStats, AdminTask } from "@shared/schema";
 
 interface PrizeTier {
   minParticipants: number;
@@ -57,22 +60,40 @@ interface Participant {
 function ManageTasksForm() {
   const { walletAddress, connectWallet } = useFarcaster();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState({ castHash: '', targetFid: '', castUrl: '', targetUsername: '' });
+  const [tasks, setTasks] = useState<AdminTask[]>([
+    { id: 'task-like', type: 'like', title: 'Like the Cast', required: true, options: {} },
+    { id: 'task-recast', type: 'recast', title: 'Recast the Cast', required: true, options: {} },
+    { id: 'task-follow', type: 'follow', title: 'Follow the Creator', required: true, options: {} },
+  ]);
+  const [castText, setCastText] = useState<string>('');
+  const [editingTask, setEditingTask] = useState<AdminTask | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchConfig = async () => {
       try {
         const res = await fetch('/api/admin/tasks-config');
         const data = await res.json();
-        if (data.success) {
-          setConfig({
-            castHash: data.castHash || '',
-            targetFid: data.targetFid ? String(data.targetFid) : '',
-            castUrl: data.castUrl || '',
-            targetUsername: data.targetUsername || '',
-          });
+        setConfig({
+          castHash: data.castHash || '',
+          targetFid: data.targetFid ? String(data.targetFid) : '',
+          castUrl: data.castUrl || '',
+          targetUsername: data.targetUsername || '',
+        });
+        // Normalize tasks: accept either old string[] or AdminTask[]
+        if (Array.isArray(data.tasks)) {
+          if (data.tasks.length > 0 && typeof data.tasks[0] === 'string') {
+            setTasks((data.tasks as string[]).map((t: string, i: number) => ({ id: String(i) + '-' + t, type: t as any, title: t, required: true } as AdminTask)));
+          } else {
+            setTasks(data.tasks as AdminTask[]);
+          }
+        } else {
+          setTasks([]);
         }
+        setCastText(data.castText || '');
       } catch (e) {
         console.warn('Failed to fetch admin config', e);
       }
@@ -114,10 +135,12 @@ function ManageTasksForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           walletAddress: currentWallet,
+          tasks,
           castHash: config.castHash,
-          targetFid: config.targetFid,
+          targetFid: config.targetFid ? parseInt(config.targetFid) : undefined,
           castUrl: config.castUrl,
           targetUsername: config.targetUsername,
+          castText,
           challenge,
         }),
       });
@@ -125,6 +148,8 @@ function ManageTasksForm() {
       const updateData = await updateRes.json();
       if (updateData.success) {
         toast({ title: 'Updated', description: 'Tasks configuration updated' });
+        // Invalidate tasks query so home page gets new config
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       } else {
         toast({ title: 'Failed', description: updateData.message || 'Update failed', variant: 'destructive' });
       }
@@ -139,48 +164,112 @@ function ManageTasksForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium mb-1">Cast Hash</label>
-        <input 
-          value={config.castHash} 
-          onChange={e => setConfig({ ...config, castHash: e.target.value })} 
-          className="w-full px-3 py-2 border rounded-md"
-          placeholder="0x..."
-        />
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium mb-1">Social Task Manager</label>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); }}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline" onClick={() => setEditingTask({ id: '', type: 'like', title: '', required: true, options: {} as any })}>+ Add Task</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingTask ? 'Edit Task' : 'Add Task'}</DialogTitle>
+                <DialogDescription>Configure a social task and its parameters.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs mb-1">Type</label>
+                  <select value={editingTask?.type || 'like'} onChange={(e) => setEditingTask(prev => ({ ...(prev || { id: '', title: '', required: true, options: {} }), type: e.target.value as any }))} className="w-full px-2 py-2 border rounded">
+                    <option value="like">Like</option>
+                    <option value="recast">Recast</option>
+                    <option value="follow">Follow</option>
+                    <option value="cast">Cast (post)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs mb-1">Title (label shown to users)</label>
+                  <input value={editingTask?.title || ''} onChange={(e) => setEditingTask(prev => ({ ...(prev || { id: '', type: 'like', required: true, options: {} }), title: e.target.value }))} className="w-full px-2 py-2 border rounded" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="inline-flex items-center gap-2">
+                    <input type="checkbox" checked={!!editingTask?.required} onChange={(e) => setEditingTask(prev => ({ ...(prev || { id: '', type: 'like', title: '', options: {} }), required: e.target.checked }))} />
+                    <span className="text-sm">Required</span>
+                  </label>
+                </div>
+                {/* Type-specific options */}
+                {editingTask?.type === 'cast' && (
+                  <div>
+                    <label className="block text-xs mb-1">Cast Text</label>
+                    <textarea value={editingTask?.options?.castText || ''} onChange={(e) => setEditingTask(prev => ({ ...(prev || { id: '', type: 'cast', title: '', required: true, options: {} }), options: { ...(prev?.options || {}), castText: e.target.value } }))} className="w-full px-2 py-2 border rounded h-24" />
+                    <label className="block text-xs mb-1 mt-2">Cast Hash (optional)</label>
+                    <input value={editingTask?.options?.castHash || ''} onChange={(e) => setEditingTask(prev => ({ ...(prev || { id: '', type: 'cast', title: '', required: true, options: {} }), options: { ...(prev?.options || {}), castHash: e.target.value } }))} className="w-full px-2 py-2 border rounded" />
+                  </div>
+                )}
+                {editingTask?.type === 'follow' && (
+                  <div>
+                    <label className="block text-xs mb-1">Target FID</label>
+                    <input value={editingTask?.options?.targetFid || ''} onChange={(e) => setEditingTask(prev => ({ ...(prev || { id: '', type: 'follow', title: '', required: true, options: {} }), options: { ...(prev?.options || {}), targetFid: e.target.value ? Number(e.target.value) : undefined } }))} className="w-full px-2 py-2 border rounded" />
+                    <label className="block text-xs mb-1 mt-2">Target Username</label>
+                    <input value={editingTask?.options?.targetUsername || ''} onChange={(e) => setEditingTask(prev => ({ ...(prev || { id: '', type: 'follow', title: '', required: true, options: {} }), options: { ...(prev?.options || {}), targetUsername: e.target.value } }))} className="w-full px-2 py-2 border rounded" />
+                  </div>
+                )}
+                {(editingTask?.type === 'like' || editingTask?.type === 'recast') && (
+                  <div>
+                    <label className="block text-xs mb-1">Cast Hash to act on</label>
+                    <input value={editingTask?.options?.castHash || ''} onChange={(e) => setEditingTask(prev => ({ ...(prev || { id: '', type: 'like', title: '', required: true, options: {} }), options: { ...(prev?.options || {}), castHash: e.target.value } }))} className="w-full px-2 py-2 border rounded" />
+                    <label className="block text-xs mb-1 mt-2">Optional Cast URL</label>
+                    <input value={editingTask?.options?.castUrl || ''} onChange={(e) => setEditingTask(prev => ({ ...(prev || { id: '', type: 'like', title: '', required: true, options: {} }), options: { ...(prev?.options || {}), castUrl: e.target.value } }))} className="w-full px-2 py-2 border rounded" />
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={() => {
+                    // save editingTask
+                    if (!editingTask) return;
+                    const task = { ...editingTask, id: editingTask.id || `${Date.now()}-${Math.random().toString(36).slice(2,6)}` };
+                    setTasks(prev => {
+                      const found = prev.findIndex(p => p.id === task.id);
+                      if (found === -1) return [...prev, task];
+                      const next = prev.slice(); next[found] = task; return next;
+                    });
+                    setIsDialogOpen(false);
+                    setEditingTask(null);
+                  }}>{editingTask ? 'Save Task' : 'Add Task'}</Button>
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+        <div className="mt-3 space-y-2">
+          {tasks.length === 0 && (<p className="text-sm text-muted-foreground">No tasks configured yet. Click + Add Task to create one.</p>)}
+          {tasks.map((t, idx) => (
+            <div key={t.id} className="p-3 border rounded flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <div className="font-semibold">{t.title || t.type}</div>
+                  <div className="text-xs text-muted-foreground">{t.type} • {t.required ? 'Required' : 'Optional'}</div>
+                </div>
+                {t.options?.castText && <div className="text-sm text-muted-foreground mt-2">{t.options.castText}</div>}
+              </div>
+              <div className="flex gap-2 ml-4">
+                <Button size="sm" variant="outline" onClick={() => { setEditingTask(t); setIsDialogOpen(true); }}>Edit</Button>
+                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setTasks(prev => prev.filter(x => x.id !== t.id))}>Delete</Button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium mb-1">Target FID</label>
-        <input 
-          value={config.targetFid} 
-          onChange={e => setConfig({ ...config, targetFid: e.target.value })} 
-          className="w-full px-3 py-2 border rounded-md"
-          placeholder="123456"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-1">Cast URL</label>
-        <input 
-          value={config.castUrl} 
-          onChange={e => setConfig({ ...config, castUrl: e.target.value })} 
-          className="w-full px-3 py-2 border rounded-md"
-          placeholder="https://..."
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-1">Target Username</label>
-        <input 
-          value={config.targetUsername} 
-          onChange={e => setConfig({ ...config, targetUsername: e.target.value })} 
-          className="w-full px-3 py-2 border rounded-md"
-          placeholder="@username"
-        />
-      </div>
-      <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save Changes'}</Button>
+      <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save Configuration'}</Button>
     </form>
   );
 }
 
+
+
 export default function Admin() {
   const { walletAddress } = useFarcaster();
+  const [isOwner, setIsOwner] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isExecuting, setIsExecuting] = useState(false);
@@ -203,6 +292,36 @@ export default function Admin() {
   } = useQuery<Participant[]>({
     queryKey: ["/api/admin/participants"],
   });
+
+  useEffect(() => {
+    let mounted = true;
+    const checkOwner = async () => {
+      if (!walletAddress) {
+        if (mounted) setIsOwner(false);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/verify-owner', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ walletAddress }),
+        });
+        if (!res.ok) {
+          if (mounted) setIsOwner(false);
+          return;
+        }
+        const data = await res.json();
+        if (mounted) setIsOwner(Boolean(data.isOwner));
+      } catch (e) {
+        console.warn('Failed to verify owner', e);
+        if (mounted) setIsOwner(false);
+      }
+    };
+
+    checkOwner();
+    return () => { mounted = false; };
+  }, [walletAddress]);
 
 
   const handleExecuteLottery = async () => {
@@ -382,21 +501,41 @@ export default function Admin() {
           </Card>
         </section>
 
-        {/* Manage Tasks Section */}
-        <Card className="border" data-testid="card-manage-tasks">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-primary" />
-              Manage Social Tasks
-            </CardTitle>
-            <CardDescription>
-              Configure the cast and user details for the social task requirement
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ManageTasksForm />
-          </CardContent>
-        </Card>
+        {/* Manage Tasks Section - visible only to contract owner */}
+        {isOwner && (
+          <Card className="border" data-testid="card-manage-tasks">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-primary" />
+                Manage Social Tasks
+              </CardTitle>
+              <CardDescription>
+                Configure the cast and user details for the social task requirement
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ManageTasksForm />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Deploy Lottery - owner only */}
+        {isOwner && (
+          <Card className="border" data-testid="card-deploy-lottery">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-primary" />
+                Deploy New Lottery
+              </CardTitle>
+              <CardDescription>
+                Deploy a new SocialQuest contract (SBT + Lottery) via Foundry. Server must have Foundry and deploy key configured.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DeployLotteryForm walletAddress={walletAddress} />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Execute Lottery Section - Only show if lottery hasn't been executed yet */}
         {!txHash && !lotteryStats?.isExecuted && (
@@ -520,7 +659,6 @@ export default function Admin() {
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
                       <TableHead>Wallet Address</TableHead>
-                      <TableHead>Minted At</TableHead>
                       <TableHead className="text-right">Status</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -539,9 +677,6 @@ export default function Admin() {
                           >
                             {participant.address.slice(0, 10)}...{participant.address.slice(-8)}
                           </a>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(participant.mintedAt * 1000).toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right">
                           {participant.isWinner ? (

@@ -1,8 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Heart, Repeat2, UserPlus, Loader2, ExternalLink } from "lucide-react";
-import type { Task, TaskType } from "@shared/schema";
+import { Check, Heart, Repeat2, UserPlus, Loader2, ExternalLink, MessageSquare } from "lucide-react";
+import type { Task, TaskType, AdminTask } from "@shared/schema";
 
 interface TaskCardProps {
   type: TaskType;
@@ -11,10 +11,11 @@ interface TaskCardProps {
   isVerifying: boolean;
   onVerify: () => void;
   onOpenAction: () => void;
+  taskConfig?: AdminTask;
   targetUsername?: string;
 }
 
-const taskConfig: Record<TaskType, {
+const defaultTaskConfig: Record<TaskType, {
   title: string;
   description: string;
   actionText: string;
@@ -38,6 +39,12 @@ const taskConfig: Record<TaskType, {
     actionText: "Follow",
     icon: UserPlus,
   },
+  cast: {
+    title: "Post a Cast",
+    description: "Post a cast to participate",
+    actionText: "Post",
+    icon: MessageSquare,
+  },
 };
 
 export function TaskCard({
@@ -47,14 +54,23 @@ export function TaskCard({
   isVerifying,
   onVerify,
   onOpenAction,
+  taskConfig,
   targetUsername,
 }: TaskCardProps) {
-  const config = taskConfig[type];
-  const Icon = config.icon;
+  // Use custom config if provided, otherwise use defaults
+  const defaultConfig = defaultTaskConfig[type];
+  const title = taskConfig?.title || defaultConfig.title;
+  const Icon = defaultConfig.icon;
   const isVerified = task?.status === "verified";
-  const description = type === "follow" && targetUsername 
-    ? `Follow @${targetUsername} to stay updated`
-    : config.description;
+  
+  let description = defaultConfig.description;
+  if (type === "follow" && targetUsername) {
+    description = `Follow @${targetUsername} to stay updated`;
+  } else if (type === "cast" && taskConfig?.options?.castText) {
+    description = taskConfig.options.castText;
+  } else if (taskConfig?.options?.castText) {
+    description = taskConfig.options.castText;
+  }
 
   return (
     <Card 
@@ -88,7 +104,7 @@ export function TaskCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold text-foreground">
-                {config.title}
+                {title}
               </h3>
               {isVerified && (
                 <Badge 
@@ -131,7 +147,7 @@ export function TaskCard({
                   data-testid={`button-open-${type}`}
                 >
                   <ExternalLink className="h-3 w-3" />
-                  {config.actionText}
+                  {defaultConfig.actionText}
                 </Button>
                 <Button
                   size="sm"

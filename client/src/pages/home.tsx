@@ -12,9 +12,7 @@ import { useFarcaster } from "@/lib/farcaster";
 import { APP_CONFIG } from "@/lib/config";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Task, TaskType, UserProgress, LotteryStats as LotteryStatsType } from "@shared/schema";
-
-const TASK_ORDER: TaskType[] = ["like", "recast", "follow"];
+import type { Task, TaskType, UserProgress, LotteryStats as LotteryStatsType, AdminTask } from "@shared/schema";
 
 interface AppConfig {
   castHash: string;
@@ -33,11 +31,32 @@ interface PrizeTier {
 }
 
 export default function Home() {
-  const { isReady, isInFrame, user, walletAddress, openUrl, connectWallet } = useFarcaster();
+  const { isReady, isInFrame, user, walletAddress, openUrl, connectWallet, composeCast } = useFarcaster();
   const { toast } = useToast();
   const [verifyingTask, setVerifyingTask] = useState<TaskType | null>(null);
   const [onChainMintStatus, setOnChainMintStatus] = useState<boolean | null>(null);
   const [config, setConfig] = useState<AppConfig | null>(null);
+
+  // Fetch custom tasks configuration
+  const { 
+    data: customTasks = [], 
+    isLoading: isLoadingTasks,
+  } = useQuery<AdminTask[]>({
+    queryKey: ["/api/tasks"],
+    queryFn: async () => {
+      const res = await fetch("/api/tasks");
+      if (!res.ok) throw new Error("Failed to fetch tasks");
+      return res.json();
+    },
+  });
+
+  // Get task order from custom tasks (filter for required tasks)
+  const taskOrder: TaskType[] = customTasks && customTasks.length > 0
+    ? customTasks
+        .filter(t => t.required !== false)
+        .map(t => t.type as TaskType)
+        .filter((type, i, arr) => arr.indexOf(type) === i)
+    : ["like", "recast", "follow"];
 
   // Fetch user progress
   const { 
@@ -72,15 +91,23 @@ export default function Home() {
         throw new Error("Please connect your wallet first");
       }
       
+      console.log(`[Verify] Starting verification for task: ${taskType}`);
       const response = await apiRequest("POST", "/api/verify-task", {
         taskType,
         fid: user.fid,
         walletAddress,
       });
       
+      console.log(`[Verify] Response status: ${response.status}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: "Unknown error" }));
+        throw new Error(errorData.message || `HTTP ${response.status}`);
+      }
+      
       return response.json();
     },
     onSuccess: (data, taskType) => {
+      console.log(`[Verify] Success response:`, data);
       if (data.success) {
         toast({
           title: "Task Verified!",
@@ -88,16 +115,23 @@ export default function Home() {
         });
         refetchProgress();
       } else {
+        console.error(`[Verify] Verification failed:`, data);
+        const description = data.message || "Could not verify the task. Please try again.";
         toast({
           title: "Verification Failed",
-          description: data.message || "Could not verify the task. Please try again.",
+          description,
           variant: "destructive",
         });
+        // Also log debug info if available
+        if (data.debug) {
+          console.log(`[Verify] Debug info:`, data.debug);
+        }
       }
     },
     onError: (error) => {
+      console.error(`[Verify] Error:`, error);
       toast({
-        title: "Error",
+        title: "Verification Error",
         description: error instanceof Error ? error.message : "Something went wrong",
         variant: "destructive",
       });
@@ -128,12 +162,21 @@ export default function Home() {
     const castHash = config?.castHash || APP_CONFIG.castHash;
     const targetFid = config?.targetFid || APP_CONFIG.targetFid;
     
+    // Get task config from custom tasks
+    const taskConfig = customTasks.find(t => t.type === taskType);
+    
     if (taskType === "like" || taskType === "recast") {
-      await openUrl(APP_CONFIG.castUrl);
+      const castUrl = (taskConfig?.options as any)?.castUrl || APP_CONFIG.castUrl;
+      await openUrl(castUrl);
     } else if (taskType === "follow") {
-      await openUrl(`https://warpcast.com/${APP_CONFIG.targetUsername}`);
+      const targetUsername = (taskConfig?.options as any)?.targetUsername || APP_CONFIG.targetUsername;
+      await openUrl(`https://warpcast.com/${targetUsername}`);
+    } else if (taskType === "cast") {
+      // For cast task, use SDK composeCast with suggested text
+      const castText = (taskConfig?.options as any)?.castText || "Check out this awesome quest!";
+      await composeCast({ text: castText });
     }
-  }, [openUrl, config]);
+  }, [openUrl, config, customTasks, composeCast]);
 
   // Fetch config from backend
   useEffect(() => {
@@ -218,11 +261,11 @@ export default function Home() {
 
   // Check if a task is locked (previous task not completed)
   const isTaskLocked = (type: TaskType): boolean => {
-    const taskIndex = TASK_ORDER.indexOf(type);
+    const taskIndex = taskOrder.indexOf(type);
     if (taskIndex === 0) return false;
     
     for (let i = 0; i < taskIndex; i++) {
-      const prevTask = getTask(TASK_ORDER[i]);
+      const prevTask = getTask(taskOrder[i]);
       if (!prevTask || prevTask.status !== "verified") {
         return true;
       }
@@ -232,7 +275,7 @@ export default function Home() {
 
   // Count completed tasks
   const completedTasksCount = userProgress?.tasks?.filter(t => t.status === "verified").length || 0;
-  const allTasksCompleted = completedTasksCount === TASK_ORDER.length;
+  const allTasksCompleted = completedTasksCount === taskOrder.length;
   // Use on-chain check as source of truth (overrides backend storage)
   const hasMinted = onChainMintStatus !== null ? onChainMintStatus : !!userProgress?.mintedAt;
 
@@ -333,22 +376,31 @@ export default function Home() {
           <section data-testid="section-tasks">
             <h2 className="text-xl font-semibold mb-4">Complete Tasks</h2>
             
-            {isLoadingProgress ? (
+            {isLoadingTasks || isLoadingProgress ? (
               <div className="space-y-4">
                 <Skeleton className="h-2 w-full" />
-                {TASK_ORDER.map((type) => (
-                  <Skeleton key={type} className="h-24 w-full rounded-lg" />
-                ))}
+                {taskOrder.length > 0 ? (
+                  taskOrder.map((type) => (
+                    <Skeleton key={type} className="h-24 w-full rounded-lg" />
+                  ))
+                ) : (
+                  // Show 3 default skeletons while loading
+                  <>
+                    <Skeleton className="h-24 w-full rounded-lg" />
+                    <Skeleton className="h-24 w-full rounded-lg" />
+                    <Skeleton className="h-24 w-full rounded-lg" />
+                  </>
+                )}
               </div>
             ) : (
               <>
                 <ProgressIndicator 
                   completedTasks={completedTasksCount} 
-                  totalTasks={TASK_ORDER.length} 
+                  totalTasks={taskOrder.length} 
                 />
                 
                 <div className="space-y-4">
-                  {TASK_ORDER.map((type) => (
+                  {taskOrder.map((type) => (
                     <TaskCard
                       key={type}
                       type={type}
@@ -357,7 +409,8 @@ export default function Home() {
                       isVerifying={verifyingTask === type}
                       onVerify={() => handleVerifyTask(type)}
                       onOpenAction={() => handleOpenAction(type)}
-                      targetUsername={APP_CONFIG.targetUsername}
+                      taskConfig={customTasks.find(t => t.type === type)}
+                      targetUsername={customTasks.find(t => t.type === type)?.options?.targetUsername || APP_CONFIG.targetUsername}
                     />
                   ))}
                 </div>
